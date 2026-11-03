@@ -98,7 +98,7 @@ fun MediaGrid(
     ) {
         when (media.size) {
             1 -> {
-                // Single image layout - edge-to-edge with natural aspect ratio support
+                // Single image layout - edge-to-edge (0 left, 0 right) with natural aspect ratio support
                 val item = media[0]
                 val displayUrl = item.full ?: item.feed ?: item.url
                 val aspectRatio = if (item.width != null && item.height != null && item.width > 0 && item.height > 0) {
@@ -112,35 +112,28 @@ fun MediaGrid(
                     low = item.thumb ?: item.url
                 )
 
-                val clampedRatio = aspectRatio?.coerceIn(0.56f, 2.4f)
+                val effectiveRatio = aspectRatio?.coerceIn(0.65f, 1.91f)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 160.dp, max = maxHeight)
+                        .then(
+                            if (effectiveRatio != null) {
+                                Modifier.aspectRatio(effectiveRatio, matchHeightConstraintsFirst = false)
+                            } else {
+                                Modifier.heightIn(min = 220.dp, max = maxHeight)
+                            }
+                        )
+                        .heightIn(max = maxHeight)
                         .clipToBounds()
-                        .background(Color(0xFF050B18))
                         .clickable { handleClick(displayUrl, 0) }
-                        .testTag("media_grid_item_0"),
-                    contentAlignment = Alignment.Center
+                        .testTag("media_grid_item_0")
                 ) {
                     SeamlessImage(
                         urls = versions,
                         contentDescription = item.alt ?: "Post image",
-                        contentScale = ContentScale.Fit,
+                        contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 160.dp, max = maxHeight)
-                            .then(
-                                if (clampedRatio != null) {
-                                    if (clampedRatio < 1f) {
-                                        Modifier.aspectRatio(clampedRatio, matchHeightConstraintsFirst = true)
-                                    } else {
-                                        Modifier.aspectRatio(clampedRatio)
-                                    }
-                                } else {
-                                    Modifier.heightIn(min = 160.dp, max = maxHeight)
-                                }
-                            )
+                            .fillMaxSize()
                             .clipToBounds()
                     )
                 }

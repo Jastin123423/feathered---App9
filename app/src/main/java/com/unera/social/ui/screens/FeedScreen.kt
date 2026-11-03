@@ -168,6 +168,7 @@ fun FeedScreen(
     onAddComment: ((Long, String) -> Unit)? = null,
     onLikeComment: ((Long, Long) -> Unit)? = null,
     onDeleteComment: ((Long, Long) -> Unit)? = null,
+    onToggleHideComment: ((Long, Long, Boolean) -> Unit)? = null,
     onSavePost: (Long) -> Unit,
     onUserClick: (User) -> Unit,
     onAddStoryClick: () -> Unit = onOpenCreatePost,
@@ -218,8 +219,9 @@ fun FeedScreen(
                 result.add(p)
                 if ((i + 1) % 5 == 0 && adIndex < ads.size) {
                     val ad = ads[adIndex]
+                    val adPostId = ad.postId ?: if (ad.id > 0) ad.id else (-100000L - ad.id)
                     val adPost = Post(
-                        id = -100000L - ad.id,
+                        id = adPostId,
                         userId = ad.brandId ?: 0L,
                         author = User(
                             id = ad.brandId ?: 0L,
@@ -228,7 +230,7 @@ fun FeedScreen(
                             profileImageUrl = ad.sponsorAvatar.ifBlank { "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400" },
                             isVerified = true
                         ),
-                        content = ad.description,
+                        content = ad.description.trim().let { if (it.equals("null", ignoreCase = true) || it.equals("undefined", ignoreCase = true)) "" else it },
                         timestamp = "Ad",
                         mediaUrl = ad.imageUrl ?: ad.videoUrl,
                         mediaUrls = if (!ad.imageUrl.isNullOrBlank()) listOf(ad.imageUrl) else emptyList(),
@@ -652,6 +654,9 @@ fun FeedScreen(
                 },
                 onDeleteComment = { commentId ->
                     onDeleteComment?.invoke(livePost.id, commentId)
+                },
+                onToggleHideComment = { commentId, isHidden ->
+                    onToggleHideComment?.invoke(livePost.id, commentId, isHidden)
                 },
                 onProfileClick = { author ->
                     discussionsSheetPost = null
@@ -1313,22 +1318,25 @@ fun WebPostCard(
 
             // Post Text Content
             // Post Text Content (avoid duplicating event/product/song titles that are already inside their respective cards)
-            val isDuplicateText = (post.event != null && (post.content.equals(post.event.title, ignoreCase = true) || post.content.equals(post.event.description, ignoreCase = true))) ||
-                    (post.product != null && (post.content.equals(post.product.title, ignoreCase = true) || post.content.equals(post.product.description, ignoreCase = true))) ||
-                    (post.song != null && post.content.contains(post.song.title, ignoreCase = true))
+            val cleanContent = remember(post.content) {
+                post.content.trim().let { if (it.equals("null", ignoreCase = true) || it.equals("undefined", ignoreCase = true)) "" else it }
+            }
+            val isDuplicateText = (post.event != null && (cleanContent.equals(post.event.title, ignoreCase = true) || cleanContent.equals(post.event.description, ignoreCase = true))) ||
+                    (post.product != null && (cleanContent.equals(post.product.title, ignoreCase = true) || cleanContent.equals(post.product.description, ignoreCase = true))) ||
+                    (post.song != null && cleanContent.contains(post.song.title, ignoreCase = true))
 
-            if (!isDuplicateText && post.content.isNotBlank() && post.backgroundStyle.isNullOrBlank()) {
-                val words = remember(post.content) {
-                    post.content.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+            if (!isDuplicateText && cleanContent.isNotBlank() && post.backgroundStyle.isNullOrBlank()) {
+                val words = remember(cleanContent) {
+                    cleanContent.split(Regex("\\s+")).filter { it.isNotBlank() }
                 }
                 val hasMoreThan8Words = words.size > 8
-                val truncatedContent = remember(post.content, words) {
-                    if (words.size > 8) words.take(8).joinToString(" ") + "…" else post.content
+                val truncatedContent = remember(cleanContent, words) {
+                    if (words.size > 8) words.take(8).joinToString(" ") + "…" else cleanContent
                 }
 
                 Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
                     Text(
-                        text = if (!hasMoreThan8Words || isExpandedText) post.content else truncatedContent,
+                        text = if (!hasMoreThan8Words || isExpandedText) cleanContent else truncatedContent,
                         fontSize = 20.sp,
                         lineHeight = 28.sp,
                         color = Color(0xFFE4E6EB)

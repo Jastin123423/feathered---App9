@@ -312,6 +312,7 @@ fun FeatheredApp(
                         onAddComment = { postId, text -> viewModel.addComment(postId, text) },
                         onLikeComment = { postId, commentId -> viewModel.likeComment(postId, commentId) },
                         onDeleteComment = { postId, commentId -> viewModel.deleteComment(postId, commentId) },
+                        onToggleHideComment = { postId, commentId, isHidden -> viewModel.hideComment(postId, commentId, isHidden) },
                         onSavePost = { viewModel.toggleSavePost(it) },
                         onUserClick = { viewModel.openUserProfile(it) },
                         onAddStoryClick = { viewModel.setShowCreateStoryDialog(true) },
@@ -572,12 +573,20 @@ fun FeatheredApp(
                         trackPlays = uiState.trackPlays,
                         uploadProgress = uiState.songUploadProgress,
                         uploadStatus = uiState.songUploadStatus,
+                        isLoading = uiState.isSongsLoading,
+                        onRefresh = { viewModel.refreshLiveSongs() },
                         onPlayTrack = { viewModel.playTrack(it) },
                         onTogglePlay = { viewModel.togglePlayAudio() },
                         onToggleLikeTrack = { viewModel.toggleLikeTrack(it) },
                         onUploadSong = { title, artist, genre, album, cover, audio ->
                             if (uiState.isGuest) viewModel.openAuth("login")
                             else viewModel.uploadSong(title, artist, genre, album, cover, audio)
+                        },
+                        onPublishSingle = { title, artist, genre, album, coverUri, audioUri ->
+                            viewModel.publishSingleSong(context, title, artist, genre, album, coverUri, audioUri)
+                        },
+                        onPublishAlbum = { albumTitle, artist, genre, coverUri, tracks ->
+                            viewModel.publishAlbum(context, albumTitle, artist, genre, coverUri, tracks)
                         },
                         onDeleteUploadedSong = { viewModel.deleteUploadedSong(it) },
                         onProfileClick = { userId ->
@@ -759,9 +768,14 @@ fun FeatheredApp(
             onAddComment = { commentText ->
                 viewModel.addComment(selectedPost.id, commentText)
             },
-            onLikeComment = { _ -> },
+            onLikeComment = { commentId ->
+                viewModel.likeComment(selectedPost.id, commentId)
+            },
             onDeleteComment = { commentId ->
                 viewModel.deleteComment(selectedPost.id, commentId)
+            },
+            onToggleHideComment = { commentId, isHidden ->
+                viewModel.hideComment(selectedPost.id, commentId, isHidden)
             },
             onProfileClick = { author ->
                 viewModel.setSelectedPostForComments(null)

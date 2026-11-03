@@ -253,9 +253,13 @@ object AdsApiService {
         val id = obj.optLong("id", obj.optLong("ad_id", 0L))
         if (id == 0L) return null
 
+        val postId = obj.optLong("post_id", obj.optLong("postId", 0L)).takeIf { it > 0 }
         val title = obj.optString("title", obj.optString("name", ""))
         val headline = obj.optString("headline", obj.optString("campaign_name", title))
-        val description = obj.optString("description", obj.optString("content", ""))
+        val rawDescription = if (obj.has("description") && !obj.isNull("description")) obj.optString("description")
+            else if (obj.has("content") && !obj.isNull("content")) obj.optString("content")
+            else ""
+        val description = rawDescription.trim().let { if (it.equals("null", ignoreCase = true) || it.equals("undefined", ignoreCase = true)) "" else it }
         val imageUrl = obj.optString("imageUrl", obj.optString("image_url", obj.optString("media_url", "")))
         val videoUrl = obj.optString("videoUrl", obj.optString("video_url", ""))
         val ctaText = obj.optString("ctaText", obj.optString("cta_button", obj.optString("cta_text", "Learn More")))
@@ -268,6 +272,7 @@ object AdsApiService {
 
         return SponsoredFeedAd(
             id = id,
+            postId = postId,
             title = title,
             headline = headline,
             description = description,
@@ -303,7 +308,8 @@ object AdsApiService {
             mediaUrls.add(mediaUrl)
         }
 
-        val description = obj.optString("description", "")
+        val rawCampaignDesc = if (obj.has("description") && !obj.isNull("description")) obj.optString("description") else ""
+        val description = rawCampaignDesc.trim().let { if (it.equals("null", ignoreCase = true) || it.equals("undefined", ignoreCase = true)) "" else it }
         val cta = obj.optString("cta", obj.optString("cta_button", obj.optString("cta_text", "Learn More")))
         val link = obj.optString("link", obj.optString("destination_url", "")).ifBlank { null }
         val phone = obj.optString("phone", "").ifBlank { null }

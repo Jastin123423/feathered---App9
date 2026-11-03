@@ -15,11 +15,13 @@ import com.unera.social.data.UserApiService
 import com.unera.social.data.UserSessionManager
 import com.unera.social.data.VideosApiService
 import com.unera.social.data.FeedInteractionApiService
+import com.unera.social.data.SongsApiService
 import android.content.Context
 import android.net.Uri
 import com.unera.social.data.MediaUploadHelper
 import com.unera.social.model.*
 import com.unera.social.ui.components.PostUploadState
+import com.unera.social.ui.screens.toPost
 import org.json.JSONObject
 import android.util.Log
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -80,7 +82,8 @@ data class FeatheredUiState(
     val showMenuOverlay: Boolean = false,
     val selectedUserProfile: User? = null,
     // F-Music state
-    val songs: List<Song> = MockData.songs,
+    val songs: List<Song> = emptyList(),
+    val isSongsLoading: Boolean = false,
     val currentAudioTrack: AudioTrack? = null,
     val isPlayingAudio: Boolean = false,
     val audioPositionSeconds: Int = 0,
@@ -282,6 +285,7 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
         refreshStories()
         refreshVideos()
         refreshFeedAds()
+        refreshLiveSongs()
     }
 
     private fun enrichPostsWithAuthors(posts: List<Post>, users: List<User>): List<Post> {
@@ -535,6 +539,8 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
             fetchUserProfilePosts(uid)
         } else if (screen == Screen.GROUPS) {
             refreshGroups()
+        } else if (screen == Screen.MUSIC) {
+            refreshLiveSongs()
         }
     }
 
@@ -969,9 +975,19 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
                     )
                 } else p
             }
+            val updatedGroupPosts = state.groupPosts.map { gp ->
+                if (gp.id == postId) {
+                    val remaining = gp.comments.filter { it.id != commentId }
+                    gp.copy(
+                        comments = remaining,
+                        commentsCount = (gp.commentsCount - 1).coerceAtLeast(0)
+                    )
+                } else gp
+            }
             state.copy(
                 posts = updatedPosts,
                 videoPosts = updatedVideoPosts,
+                groupPosts = updatedGroupPosts,
                 selectedPostForComments = updatedPosts.find { it.id == postId } ?: updatedVideoPosts.find { it.id == postId }
             )
         }
@@ -982,6 +998,46 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
                 commentId = commentId,
                 userId = _uiState.value.currentUser.id,
                 parentId = targetPost.id
+            )
+        }
+    }
+
+    fun hideComment(postId: Long, commentId: Long, isHidden: Boolean) {
+        val post = _uiState.value.posts.find { it.id == postId }
+            ?: _uiState.value.videoPosts.find { it.id == postId }
+            ?: _uiState.value.selectedPostForComments
+        _uiState.update { state ->
+            fun updateCommentList(comments: List<Comment>): List<Comment> {
+                return comments.map { c ->
+                    if (c.id == commentId) c.copy(isHidden = isHidden) else c
+                }
+            }
+            val updatedPosts = state.posts.map { p ->
+                if (postId <= 0L || p.id == postId) p.copy(comments = updateCommentList(p.comments)) else p
+            }
+            val updatedVideoPosts = state.videoPosts.map { p ->
+                if (postId <= 0L || p.id == postId) p.copy(comments = updateCommentList(p.comments)) else p
+            }
+            val updatedGroupPosts = state.groupPosts.map { gp ->
+                if (postId <= 0L || gp.id == postId) gp.copy(comments = updateCommentList(gp.comments)) else gp
+            }
+            state.copy(
+                posts = updatedPosts,
+                videoPosts = updatedVideoPosts,
+                groupPosts = updatedGroupPosts,
+                selectedPostForComments = state.selectedPostForComments?.let {
+                    if (postId <= 0L || it.id == postId) it.copy(comments = updateCommentList(it.comments)) else it
+                }
+            )
+        }
+        val targetPost = post ?: Post(id = postId, author = _uiState.value.currentUser, content = "", timestamp = "")
+        viewModelScope.launch {
+            FeedInteractionApiService.hideComment(
+                itemType = targetPost.postType,
+                commentId = commentId,
+                userId = _uiState.value.currentUser.id,
+                parentId = targetPost.id,
+                action = if (isHidden) "hide" else "unhide"
             )
         }
     }
@@ -1010,9 +1066,13 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
             val updatedVideoPosts = state.videoPosts.map { p ->
                 if (postId <= 0L || p.id == postId) p.copy(comments = updateCommentList(p.comments)) else p
             }
+            val updatedGroupPosts = state.groupPosts.map { gp ->
+                if (postId <= 0L || gp.id == postId) gp.copy(comments = updateCommentList(gp.comments)) else gp
+            }
             state.copy(
                 posts = updatedPosts,
                 videoPosts = updatedVideoPosts,
+                groupPosts = updatedGroupPosts,
                 selectedPostForComments = state.selectedPostForComments?.let {
                     if (postId <= 0L || it.id == postId) it.copy(comments = updateCommentList(it.comments)) else it
                 }
@@ -3040,6 +3100,157 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.update { it.copy(activeShareTrack = null) }
     }
 
+    fun refreshLiveSongs() {
+        launchSafe {
+            _uiState.update { it.copy(isSongsLoading = true) }
+            val liveSongs = SongsApiService.fetchSongs()
+            _uiState.update { state ->
+                state.copy(
+                    songs = liveSongs,
+                    isSongsLoading = false
+                )
+            }
+        }
+    }
+
+    fun publishSingleSong(
+        context: Context,
+        title: String,
+        artist: String,
+        genre: String,
+        album: String,
+        coverUri: Uri,
+        audioUri: Uri,
+        onComplete: ((Boolean, String?) -> Unit)? = null
+    ) {
+        if (_uiState.value.isGuest || !_uiState.value.isLoggedIn) {
+            openAuth("login")
+            onComplete?.invoke(false, "Authentication required")
+            return
+        }
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(songUploadProgress = 15, songUploadStatus = "Uploading audio...") }
+                val audioUrl = MediaUploadHelper.uploadAudioFile(context, audioUri)
+                if (audioUrl.isNullOrBlank()) {
+                    _uiState.update { it.copy(songUploadProgress = null, songUploadStatus = null) }
+                    onComplete?.invoke(false, "Audio upload failed")
+                    return@launch
+                }
+
+                _uiState.update { it.copy(songUploadProgress = 50, songUploadStatus = "Compressing artwork...") }
+                val coverUrl = SongsApiService.uploadCompressedCover(context, coverUri)
+                    ?: SongsApiService.DEFAULT_MUSIC_COVER
+
+                _uiState.update { it.copy(songUploadProgress = 80, songUploadStatus = "Publishing track...") }
+                val token = UserSessionManager.getAuthToken(context)
+                val created = SongsApiService.createSong(
+                    uploaderId = _uiState.value.currentUser.id,
+                    title = title.trim().ifBlank { "Untitled Single" },
+                    artistName = artist.trim().ifBlank { _uiState.value.currentUser.name },
+                    albumName = album.trim().ifBlank { "Single" },
+                    coverImageUrl = coverUrl,
+                    audioUrl = audioUrl,
+                    genre = genre.trim().ifBlank { "Afrobeats" },
+                    token = token
+                )
+
+                if (created != null) {
+                    _uiState.update { state ->
+                        state.copy(
+                            songs = listOf(created) + state.songs.filter { it.id != created.id },
+                            songUploadProgress = 100,
+                            songUploadStatus = "Song published successfully!"
+                        )
+                    }
+                    refreshLiveSongs()
+                    delay(1000)
+                    _uiState.update { it.copy(songUploadProgress = null, songUploadStatus = null) }
+                    onComplete?.invoke(true, null)
+                } else {
+                    _uiState.update { it.copy(songUploadProgress = null, songUploadStatus = null) }
+                    onComplete?.invoke(false, "Failed to register song")
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(songUploadProgress = null, songUploadStatus = null) }
+                onComplete?.invoke(false, e.localizedMessage ?: "Upload error")
+            }
+        }
+    }
+
+    fun publishAlbum(
+        context: Context,
+        albumTitle: String,
+        artist: String,
+        genre: String,
+        sharedCoverUri: Uri,
+        tracks: List<AlbumTrackInput>,
+        onComplete: ((Boolean, String?) -> Unit)? = null
+    ) {
+        if (_uiState.value.isGuest || !_uiState.value.isLoggedIn) {
+            openAuth("login")
+            onComplete?.invoke(false, "Authentication required")
+            return
+        }
+        if (tracks.isEmpty()) {
+            onComplete?.invoke(false, "At least one track is required")
+            return
+        }
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(songUploadProgress = 10, songUploadStatus = "Compressing album cover...") }
+                val albumCoverUrl = SongsApiService.uploadCompressedCover(context, sharedCoverUri)
+                    ?: SongsApiService.DEFAULT_MUSIC_COVER
+
+                val token = UserSessionManager.getAuthToken(context)
+                var successCount = 0
+
+                for ((index, track) in tracks.withIndex()) {
+                    val stepProgress = 15 + ((index.toFloat() / tracks.size.toFloat()) * 75).toInt()
+                    _uiState.update {
+                        it.copy(
+                            songUploadProgress = stepProgress,
+                            songUploadStatus = "Uploading track ${index + 1}/${tracks.size}: ${track.title}..."
+                        )
+                    }
+
+                    val audioUrl = MediaUploadHelper.uploadAudioFile(context, track.audioUri)
+                    if (audioUrl.isNullOrBlank()) continue
+
+                    val trackCoverUrl = if (track.coverUri != null) {
+                        SongsApiService.uploadCompressedCover(context, track.coverUri) ?: albumCoverUrl
+                    } else albumCoverUrl
+
+                    val created = SongsApiService.createSong(
+                        uploaderId = _uiState.value.currentUser.id,
+                        title = track.title.trim().ifBlank { "Track ${index + 1}" },
+                        artistName = (track.artist ?: artist).trim().ifBlank { _uiState.value.currentUser.name },
+                        albumName = albumTitle.trim().ifBlank { "Album" },
+                        coverImageUrl = trackCoverUrl,
+                        audioUrl = audioUrl,
+                        genre = genre.trim().ifBlank { "Afrobeats" },
+                        token = token
+                    )
+                    if (created != null) successCount++
+                }
+
+                _uiState.update {
+                    it.copy(
+                        songUploadProgress = 100,
+                        songUploadStatus = "Album published with $successCount tracks!"
+                    )
+                }
+                refreshLiveSongs()
+                delay(1200)
+                _uiState.update { it.copy(songUploadProgress = null, songUploadStatus = null) }
+                onComplete?.invoke(successCount > 0, if (successCount > 0) null else "No tracks uploaded")
+            } catch (e: Exception) {
+                _uiState.update { it.copy(songUploadProgress = null, songUploadStatus = null) }
+                onComplete?.invoke(false, e.localizedMessage ?: "Album upload failed")
+            }
+        }
+    }
+
     fun uploadSong(
         title: String,
         artist: String,
@@ -3054,35 +3265,29 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
             return
         }
         viewModelScope.launch {
-            _uiState.update { it.copy(songUploadProgress = 20, songUploadStatus = "Uploading audio...") }
-            delay(400)
-            _uiState.update { it.copy(songUploadProgress = 60, songUploadStatus = "Compressing artwork...") }
-            delay(400)
-            _uiState.update { it.copy(songUploadProgress = 90, songUploadStatus = "Publishing to catalog...") }
-            delay(400)
-
-            val newSong = Song(
-                id = "song_${System.currentTimeMillis()}",
-                title = title.ifBlank { "Untitled Track" },
-                artist = artist.ifBlank { _uiState.value.currentUser.name },
-                cover = coverUrl.ifBlank { "https://media.unera.social/task_01kftb3024ed7bm84gy6j485fh_1769336848_img_0.webp" },
-                audioUrl = audioUrl.ifBlank { "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
-                duration = duration,
-                durationSeconds = 195,
+            _uiState.update { it.copy(songUploadProgress = 30, songUploadStatus = "Publishing track...") }
+            val token = UserSessionManager.getAuthToken(getApplication<Application>().applicationContext)
+            val created = SongsApiService.createSong(
                 uploaderId = _uiState.value.currentUser.id,
-                uploadDate = "Just now",
-                genre = genre.ifBlank { "Afrobeats" },
-                album = album.ifBlank { "Single" },
-                isVerified = _uiState.value.currentUser.isVerified,
-                stats = SongStats(plays = 1L, likes = 0L)
+                title = title.trim().ifBlank { "Untitled Track" },
+                artistName = artist.trim().ifBlank { _uiState.value.currentUser.name },
+                albumName = album.trim().ifBlank { "Single" },
+                coverImageUrl = coverUrl.ifBlank { SongsApiService.DEFAULT_MUSIC_COVER },
+                audioUrl = audioUrl,
+                genre = genre.trim().ifBlank { "Afrobeats" },
+                token = token
             )
-
-            _uiState.update { state ->
-                state.copy(
-                    songs = listOf(newSong) + state.songs,
-                    songUploadProgress = 100,
-                    songUploadStatus = "Track published!"
-                )
+            if (created != null) {
+                _uiState.update { state ->
+                    state.copy(
+                        songs = listOf(created) + state.songs.filter { it.id != created.id },
+                        songUploadProgress = 100,
+                        songUploadStatus = "Track published!"
+                    )
+                }
+                refreshLiveSongs()
+            } else {
+                _uiState.update { it.copy(songUploadProgress = 100, songUploadStatus = "Failed to publish") }
             }
             delay(1200)
             _uiState.update { it.copy(songUploadProgress = null, songUploadStatus = null) }
@@ -3090,12 +3295,17 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun deleteUploadedSong(songId: String) {
+        val uid = _uiState.value.currentUser.id
+        val token = UserSessionManager.getAuthToken(getApplication<Application>().applicationContext)
         _uiState.update { state ->
             val updated = state.songs.filter { it.id != songId }
             state.copy(
                 songs = updated,
                 currentAudioTrack = if (state.currentAudioTrack?.id == songId) null else state.currentAudioTrack
             )
+        }
+        viewModelScope.launch {
+            SongsApiService.deleteSong(songId, uid, token)
         }
     }
 
@@ -3575,10 +3785,13 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
             return
         }
         val currentUserId = _uiState.value.currentUser.id
+        val groupPost = _uiState.value.groupPosts.find { it.id == postId } ?: return
+        val wasLiked = groupPost.isLiked
+        val finalReactionToSend = if (wasLiked) "unlike" else reaction
+
         _uiState.update { state ->
             val updated = state.groupPosts.map { post ->
                 if (post.id == postId) {
-                    val wasLiked = post.isLiked
                     val newCount = if (wasLiked) (post.likesCount - 1).coerceAtLeast(0) else post.likesCount + 1
                     post.copy(
                         isLiked = !wasLiked,
@@ -3590,7 +3803,31 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
             state.copy(groupPosts = updated)
         }
         viewModelScope.launch {
-            GroupsApiService.likeGroupPost(postId, currentUserId, reaction)
+            val group = _uiState.value.groups.find { it.id == groupPost.groupId } ?: _uiState.value.groups.find { it.id == _uiState.value.activeGroupId }
+            val postObj = groupPost.toPost(group)
+            val liveResult = FeedInteractionApiService.reactToFeedItem(
+                post = postObj,
+                userId = currentUserId,
+                reactionType = finalReactionToSend
+            )
+            _uiState.update { state ->
+                val finalMyReaction = liveResult.myReaction
+                val finalCount = liveResult.reactionsCount
+                val finalLiked = finalMyReaction != null
+                state.copy(
+                    groupPosts = state.groupPosts.map { gp ->
+                        if (gp.id == postId) {
+                            gp.copy(
+                                isLiked = finalLiked,
+                                myReaction = finalMyReaction,
+                                likesCount = finalCount,
+                                sharesCount = liveResult.sharesCount ?: gp.sharesCount,
+                                commentsCount = liveResult.commentsCount ?: gp.commentsCount
+                            )
+                        } else gp
+                    }
+                )
+            }
         }
     }
 
@@ -3601,26 +3838,52 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
         }
         if (text.isBlank()) return
         val currentUserId = _uiState.value.currentUser.id
+        val groupPost = _uiState.value.groupPosts.find { it.id == postId }
+        val newComment = Comment(
+            id = System.currentTimeMillis(),
+            author = _uiState.value.currentUser,
+            text = text,
+            timestamp = "Just now",
+            likesCount = 0,
+            isLiked = false
+        )
+        _uiState.update { state ->
+            val updated = state.groupPosts.map { post ->
+                if (post.id == postId) {
+                    post.copy(
+                        comments = post.comments + newComment,
+                        commentsCount = post.commentsCount + 1
+                    )
+                } else post
+            }
+            state.copy(groupPosts = updated)
+        }
         viewModelScope.launch {
-            val createdComment = GroupsApiService.addGroupPostComment(postId, currentUserId, text)
-            val newComment = createdComment ?: Comment(
-                id = System.currentTimeMillis(),
+            val group = _uiState.value.groups.find { it.id == groupPost?.groupId } ?: _uiState.value.groups.find { it.id == _uiState.value.activeGroupId }
+            val postObj = groupPost?.toPost(group) ?: Post(
+                id = postId,
                 author = _uiState.value.currentUser,
-                text = text,
-                timestamp = "Just now",
-                likesCount = 0,
-                isLiked = false
+                content = "",
+                timestamp = "",
+                postType = "group_post",
+                groupId = groupPost?.groupId
             )
-            _uiState.update { state ->
-                val updated = state.groupPosts.map { post ->
-                    if (post.id == postId) {
-                        post.copy(
-                            comments = post.comments + newComment,
-                            commentsCount = post.commentsCount + 1
-                        )
-                    } else post
+            val createdComment = FeedInteractionApiService.addComment(
+                post = postObj,
+                userId = currentUserId,
+                text = text
+            )
+            if (createdComment != null) {
+                _uiState.update { state ->
+                    val updated = state.groupPosts.map { post ->
+                        if (post.id == postId) {
+                            post.copy(
+                                comments = post.comments.filter { it.id != newComment.id } + createdComment
+                            )
+                        } else post
+                    }
+                    state.copy(groupPosts = updated)
                 }
-                state.copy(groupPosts = updated)
             }
         }
     }
@@ -3635,16 +3898,36 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun shareGroupPost(postId: Long) {
+    fun shareGroupPost(postId: Long, destination: String = "feed", message: String = "") {
         if (_uiState.value.isGuest || !_uiState.value.isLoggedIn) {
             openAuth("login")
             return
         }
+        val groupPost = _uiState.value.groupPosts.find { it.id == postId }
         _uiState.update { state ->
             val updated = state.groupPosts.map { post ->
                 if (post.id == postId) post.copy(sharesCount = post.sharesCount + 1) else post
             }
             state.copy(groupPosts = updated)
+        }
+        if (groupPost != null) {
+            viewModelScope.launch {
+                val group = _uiState.value.groups.find { it.id == groupPost.groupId } ?: _uiState.value.groups.find { it.id == _uiState.value.activeGroupId }
+                val postObj = groupPost.toPost(group)
+                val liveResult = FeedInteractionApiService.shareItem(
+                    post = postObj,
+                    userId = _uiState.value.currentUser.id,
+                    destination = destination,
+                    message = message
+                )
+                _uiState.update { state ->
+                    state.copy(
+                        groupPosts = state.groupPosts.map { gp ->
+                            if (gp.id == postId) gp.copy(sharesCount = liveResult.sharesCount) else gp
+                        }
+                    )
+                }
+            }
         }
     }
 

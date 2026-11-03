@@ -351,9 +351,10 @@ object PostsApiService {
             role = role
         )
 
-        val content = obj.optString("content").takeIf { it != "null" }
-            ?: obj.optString("description").takeIf { it != "null" }
+        val rawContent = obj.optString("content").takeIf { it.isNotBlank() && it != "null" && it != "undefined" }
+            ?: obj.optString("description").takeIf { it.isNotBlank() && it != "null" && it != "undefined" }
             ?: ""
+        val content = rawContent.trim().let { if (it.equals("null", ignoreCase = true) || it.equals("undefined", ignoreCase = true)) "" else it }
 
         val mediaUrls = extractMediaUrls(obj)
         val mediaTypes = extractMediaTypes(obj)
@@ -489,7 +490,7 @@ object PostsApiService {
                 title = sObj.optString("title", obj.optString("song_title", "Audio Track")),
                 artist = sObj.optString("artist_name", obj.optString("song_artist_name", author.name)),
                 album = sObj.optString("album_name", obj.optString("song_album_name", "Single")),
-                cover = sObj.optString("cover_image_url", obj.optString("song_cover_image_url", mediaUrl ?: "https://media.unera.social/task_01kftb3024ed7bm84gy6j485fh_1769336848_img_0.webp")),
+                cover = sObj.optString("cover_image_url", obj.optString("song_cover_image_url", mediaUrl ?: "https://media.featheredsocial.site/task_01kftb3024ed7bm84gy6j485fh_1769336848_img_0.webp")),
                 audioUrl = sObj.optString("audio_url", ""),
                 durationSeconds = sObj.optInt("duration_seconds", obj.optInt("song_duration_seconds", 204)),
                 genre = sObj.optString("genre", obj.optString("song_genre", "Afrobeats"))

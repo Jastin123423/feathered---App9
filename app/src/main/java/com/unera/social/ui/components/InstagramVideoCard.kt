@@ -227,14 +227,14 @@ fun InstagramVideoCard(
     var localFollowing by remember(isFollowing) { mutableStateOf(isFollowing) }
 
     // Dynamic reaction states
-    var localReaction by remember { mutableStateOf(myReaction ?: activePost.myReaction) }
-    var localReactionCount by remember { mutableIntStateOf(reactionCount ?: activePost.likesCount) }
+    var localReaction by remember(myReaction, activePost.myReaction) { mutableStateOf(myReaction ?: activePost.myReaction) }
+    var localReactionCount by remember(reactionCount, activePost.likesCount) { mutableIntStateOf(reactionCount ?: activePost.likesCount) }
     var showReactionDock by remember { mutableStateOf(false) }
 
     // Discussion and share states
-    var localCommentCount by remember { mutableIntStateOf(commentCount ?: activePost.commentsCount) }
-    var localShareCount by remember { mutableIntStateOf(shareCount ?: activePost.sharesCount) }
-    var isSaved by remember { mutableStateOf(activePost.isSaved) }
+    var localCommentCount by remember(commentCount, activePost.commentsCount) { mutableIntStateOf(commentCount ?: activePost.commentsCount) }
+    var localShareCount by remember(shareCount, activePost.sharesCount) { mutableIntStateOf(shareCount ?: activePost.sharesCount) }
+    var isSaved by remember(activePost.isSaved) { mutableStateOf(activePost.isSaved) }
 
     // Modal dialogs
     var showDiscussModal by remember { mutableStateOf(false) }

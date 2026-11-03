@@ -141,7 +141,8 @@ data class Comment(
     val myReaction: String? = null,
     val imageUrl: String? = null,
     val parentCommentId: Long? = null,
-    val replies: List<Comment> = emptyList()
+    val replies: List<Comment> = emptyList(),
+    val isHidden: Boolean = false
 )
 
 data class MediaMetaItem(
@@ -350,6 +351,7 @@ data class Post(
 
 data class SponsoredFeedAd(
     val id: Long,
+    val postId: Long? = null,
     val title: String = "",
     val headline: String = "",
     val description: String = "",
@@ -610,7 +612,7 @@ data class Song(
     val id: String,
     val title: String,
     val artist: String,
-    val cover: String = "https://media.unera.social/task_01kftb3024ed7bm84gy6j485fh_1769336848_img_0.webp",
+    val cover: String = "https://media.featheredsocial.site/task_01kftb3024ed7bm84gy6j485fh_1769336848_img_0.webp",
     val audioUrl: String = "",
     val duration: String = "3:24",
     val durationSeconds: Int = 204,
@@ -629,7 +631,7 @@ data class AudioTrack(
     val duration: Int = 180,
     val url: String = "",
     val uploaderId: Long = 1,
-    val cover: String = "https://media.unera.social/task_01kftb3024ed7bm84gy6j485fh_1769336848_img_0.webp",
+    val cover: String = "https://media.featheredsocial.site/task_01kftb3024ed7bm84gy6j485fh_1769336848_img_0.webp",
     val type: String = "music",
     val isVerified: Boolean = false,
     val likesCount: Long = 0
@@ -641,6 +643,13 @@ data class Album(
     val cover: String,
     val artist: String,
     val totalTracks: Int
+)
+
+data class AlbumTrackInput(
+    val title: String,
+    val audioUri: android.net.Uri,
+    val coverUri: android.net.Uri? = null,
+    val artist: String? = null
 )
 
 data class SongComment(

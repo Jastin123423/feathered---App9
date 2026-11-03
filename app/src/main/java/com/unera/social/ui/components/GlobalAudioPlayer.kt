@@ -31,7 +31,7 @@ import com.unera.social.model.AudioTrack
 import com.unera.social.model.User
 import com.unera.social.ui.theme.*
 
-private const val DEFAULT_MUSIC_COVER = "https://media.unera.social/task_01kftb3024ed7bm84gy6j485fh_1769336848_img_0.webp"
+private const val DEFAULT_MUSIC_COVER = "https://media.featheredsocial.site/task_01kftb3024ed7bm84gy6j485fh_1769336848_img_0.webp"
 
 @Composable
 fun GlobalAudioPlayer(

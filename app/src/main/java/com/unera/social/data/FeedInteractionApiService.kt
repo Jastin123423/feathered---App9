@@ -40,7 +40,7 @@ data class LiveShareResult(
  */
 object FeedInteractionApiService {
 
-    private const val BASE_URL = "https://media.featheredsocial.site"
+    private const val BASE_URL = "https://featheredsocial.site"
     private const val USER_AGENT = "FeatheredAndroid/1.0 (Linux; Android)"
 
     // =========================================================================
@@ -68,7 +68,7 @@ object FeedInteractionApiService {
         when {
             isGroup -> {
                 endpointUrl = "$BASE_URL/api/group-post-likes"
-                val targetPostId = post.groupId ?: post.id
+                val targetPostId = post.id
                 payload.put("user_id", userId)
                 payload.put("post_id", targetPostId)
                 payload.put("type", reactionType)
@@ -177,6 +177,88 @@ object FeedInteractionApiService {
         LiveReactResult(success = false, myReaction = newReaction, reactionsCount = newCount)
     }
 
+    /**
+     * Fetch live reactions for any post/item matching web endpoints
+     */
+    suspend fun fetchReactions(post: Post, viewerId: Long): Pair<List<com.unera.social.model.UserReaction>, Int> = withContext(Dispatchers.IO) {
+        val reactionsList = mutableListOf<com.unera.social.model.UserReaction>()
+        var count = post.likesCount
+
+        val isMusic = post.song != null || post.postType == "music" || post.postType == "song"
+        val isProduct = post.product != null || post.postType == "product" || post.postType == "marketplace"
+        val isEvent = post.event != null || post.postType == "event"
+        val isStory = post.story != null || post.postType == "story"
+
+        val endpointUrl = when {
+            isMusic -> {
+                val songId = post.song?.id?.toLongOrNull() ?: post.id
+                "$BASE_URL/api/songs/$songId/reactions?viewerId=$viewerId"
+            }
+            isProduct -> {
+                val productId = post.product?.id ?: post.id
+                "$BASE_URL/api/products/$productId/reactions"
+            }
+            isEvent -> {
+                val eventId = post.event?.id ?: post.id
+                "$BASE_URL/api/events/$eventId/reactions?viewerId=$viewerId"
+            }
+            isStory -> {
+                val storyId = post.story?.id ?: post.id
+                "$BASE_URL/api/stories/$storyId/reactions?viewerId=$viewerId"
+            }
+            else -> "$BASE_URL/api/posts/${post.id}/reactions?viewerId=$viewerId"
+        }
+
+        try {
+            val url = URL(endpointUrl)
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 8000
+                readTimeout = 8000
+                setRequestProperty("Accept", "application/json")
+                setRequestProperty("User-Agent", USER_AGENT)
+                setRequestProperty("x-user-id", viewerId.toString())
+            }
+
+            if (conn.responseCode in 200..299) {
+                val responseText = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }.trim()
+                if (responseText.startsWith("{")) {
+                    val root = JSONObject(responseText)
+                    if (root.has("reactions_count")) count = root.optInt("reactions_count")
+                    else if (root.has("count")) count = root.optInt("count")
+
+                    val arr = root.optJSONArray("reactions")
+                        ?: root.optJSONArray("data")
+                    if (arr != null) {
+                        for (i in 0 until arr.length()) {
+                            val obj = arr.optJSONObject(i) ?: continue
+                            val uid = obj.optLong("user_id", obj.optLong("id", 0L))
+                            val uName = obj.optString("user_name", obj.optString("name", "User"))
+                            val uAvatar = obj.optString("user_avatar", obj.optString("profile_image_url", ""))
+                            val type = obj.optString("type", obj.optString("reaction", "like"))
+                            reactionsList.add(com.unera.social.model.UserReaction(userId = uid, userName = uName, userAvatar = uAvatar, type = type))
+                        }
+                    }
+                } else if (responseText.startsWith("[")) {
+                    val arr = JSONArray(responseText)
+                    count = arr.length()
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.optJSONObject(i) ?: continue
+                        val uid = obj.optLong("user_id", obj.optLong("id", 0L))
+                        val uName = obj.optString("user_name", obj.optString("name", "User"))
+                        val uAvatar = obj.optString("user_avatar", obj.optString("profile_image_url", ""))
+                        val type = obj.optString("type", obj.optString("reaction", "like"))
+                        reactionsList.add(com.unera.social.model.UserReaction(userId = uid, userName = uName, userAvatar = uAvatar, type = type))
+                    }
+                }
+            }
+            conn.disconnect()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        Pair(reactionsList, count)
+    }
+
     // =========================================================================
     // 2. DISCUSS / COMMENTS
     // =========================================================================
@@ -193,7 +275,7 @@ object FeedInteractionApiService {
         val isStory = post.story != null || post.postType == "story"
 
         val endpointUrl = when {
-            isGroup -> "$BASE_URL/api/group-post-comments?post_id=${post.groupId ?: post.id}&viewerId=$viewerId"
+            isGroup -> "$BASE_URL/api/group-post-comments?post_id=${post.id}&viewerId=$viewerId"
             isMusic -> {
                 val songId = post.song?.id?.toLongOrNull() ?: post.id
                 "$BASE_URL/api/songs/$songId/comments?viewerId=$viewerId"
@@ -276,7 +358,7 @@ object FeedInteractionApiService {
         when {
             isGroup -> {
                 endpointUrl = "$BASE_URL/api/group-post-comments"
-                payload.put("post_id", post.groupId ?: post.id)
+                payload.put("post_id", post.id)
                 payload.put("text", text)
                 if (parentCommentId != null && parentCommentId > 0) payload.put("parent_comment_id", parentCommentId)
                 if (!imageUrl.isNullOrBlank()) payload.put("image_url", imageUrl)
@@ -524,7 +606,7 @@ object FeedInteractionApiService {
             isGroup -> {
                 endpointUrl = "$BASE_URL/api/groups/posts/share"
                 payload.put("user_id", userId)
-                payload.put("post_id", post.groupId ?: post.id)
+                payload.put("post_id", post.id)
                 payload.put("group_id", post.groupId ?: 0L)
                 payload.put("destination", destination)
                 payload.put("source", "feed")
@@ -681,6 +763,7 @@ object FeedInteractionApiService {
         } else if (obj.has("parent_id") && !obj.isNull("parent_id")) {
             obj.optLong("parent_id")
         } else null
+        val isHidden = obj.optBoolean("is_hidden", false) || obj.optInt("hidden", 0) == 1 || obj.optBoolean("hidden", false)
 
         return Comment(
             id = id,
@@ -690,7 +773,8 @@ object FeedInteractionApiService {
             likesCount = likesCount,
             isLiked = isLiked,
             imageUrl = imageUrl,
-            parentCommentId = parentCommentId
+            parentCommentId = parentCommentId,
+            isHidden = isHidden
         )
     }
 }

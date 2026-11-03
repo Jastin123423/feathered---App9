@@ -476,7 +476,7 @@ fun CommentActionModal(
         authorName = comment.author.name,
         authorAvatar = comment.author.profileImageUrl,
         commentText = comment.text,
-        isHidden = false,
+        isHidden = comment.isHidden,
         canHide = onToggleHide != null,
         canDelete = canDelete && onDelete != null,
         onToggleHide = { onToggleHide?.invoke(comment.id) },

@@ -308,9 +308,12 @@ fun SponsoredPostCard(
         }
 
         // 3. DESCRIPTION (Matching web)
-        if (ad.description.isNotBlank()) {
+        val cleanDescription = remember(ad.description) {
+            ad.description.trim().let { if (it.equals("null", ignoreCase = true) || it.equals("undefined", ignoreCase = true)) "" else it }
+        }
+        if (cleanDescription.isNotBlank()) {
             Text(
-                text = ad.description,
+                text = cleanDescription,
                 fontSize = 15.sp,
                 color = Color(0xFFB0B3B8),
                 lineHeight = 21.sp,
@@ -614,7 +617,7 @@ fun SponsoredPostCard(
             type = if (post.postType == "video") "video" else "image",
             mediaUrl = post.mediaUrl,
             mediaUrls = post.mediaUrls,
-            description = post.content,
+            description = post.content.trim().let { if (it.equals("null", ignoreCase = true) || it.equals("undefined", ignoreCase = true)) "" else it },
             cta = post.sponsoredCtaText.ifBlank { "Learn More" },
             link = post.sponsoredCtaUrl,
             location = post.location ?: "Global",

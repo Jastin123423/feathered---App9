@@ -772,7 +772,7 @@ object GroupsApiService {
         if (id <= 0) return null
         val adminId = obj.optLong("admin_id", obj.optLong("adminId", 1L))
         val name = obj.optString("name", "Group")
-        val desc = obj.optString("description", "")
+        val desc = obj.optString("description", "").trim().let { if (it.equals("null", ignoreCase = true) || it.equals("undefined", ignoreCase = true)) "" else it }
         val type = obj.optString("type", "public")
         val isPrivate = type.equals("private", ignoreCase = true)
         val cover = obj.optString("cover_image", obj.optString("coverImageUrl", ""))
@@ -839,7 +839,10 @@ object GroupsApiService {
             role = obj.optString("role", "member")
         )
 
-        val content = obj.optString("content", "")
+        val rawContent = if (obj.has("content") && !obj.isNull("content")) obj.optString("content")
+            else if (obj.has("description") && !obj.isNull("description")) obj.optString("description")
+            else ""
+        val content = rawContent.trim().let { if (it.equals("null", ignoreCase = true) || it.equals("undefined", ignoreCase = true)) "" else it }
 
         val mediaUrls = mutableListOf<String>()
         val mediaUrlsObj = obj.opt("media_urls")
@@ -965,7 +968,7 @@ object GroupsApiService {
         val id = obj.optLong("id")
         if (id <= 0) return null
         val title = obj.optString("title", "Event")
-        val desc = obj.optString("description", "")
+        val desc = obj.optString("description", "").trim().let { if (it.equals("null", ignoreCase = true) || it.equals("undefined", ignoreCase = true)) "" else it }
         val date = obj.optString("event_date", "")
         val loc = obj.optString("location", "")
         val cover = obj.optString("cover_url", "")

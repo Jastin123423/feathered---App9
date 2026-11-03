@@ -1848,10 +1848,13 @@ fun GroupPostCard(
             }
 
             // Text Content (with See More / See Less)
-            if (post.content.isNotBlank()) {
-                val words = remember(post.content) { post.content.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() } }
-                val isLong = words.size > 25 || post.content.length > 180
-                val displayText = if (isExpandedText || !isLong) post.content else words.take(25).joinToString(" ") + "…"
+            val cleanContent = remember(post.content) {
+                post.content.trim().let { if (it.equals("null", ignoreCase = true) || it.equals("undefined", ignoreCase = true)) "" else it }
+            }
+            if (cleanContent.isNotBlank()) {
+                val words = remember(cleanContent) { cleanContent.split("\\s+".toRegex()).filter { it.isNotEmpty() } }
+                val isLong = words.size > 25 || cleanContent.length > 180
+                val displayText = if (isExpandedText || !isLong) cleanContent else words.take(25).joinToString(" ") + "…"
 
                 Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
                     Text(

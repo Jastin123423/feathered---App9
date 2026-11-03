@@ -103,9 +103,10 @@ fun SponsoredProductCard(
         ?: adCampaign?.name?.takeIf { it.isNotBlank() }
         ?: product?.title ?: "Sponsored Product"
     val title = product?.title?.takeIf { it.isNotBlank() } ?: headline
-    val description = product?.description?.takeIf { it.isNotBlank() }
-        ?: feedAd?.description?.takeIf { it.isNotBlank() }
-        ?: adCampaign?.description ?: ""
+    val description = product?.description?.trim()?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+        ?: feedAd?.description?.trim()?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+        ?: adCampaign?.description?.trim()?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+        ?: ""
 
     val sellerId = product?.seller?.id
         ?: adCampaign?.id

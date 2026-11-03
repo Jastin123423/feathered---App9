@@ -31,14 +31,19 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import coil.compose.AsyncImage
 import com.unera.social.model.Album
+import com.unera.social.model.AlbumTrackInput
 import com.unera.social.model.AudioTrack
 import com.unera.social.model.Song
 import com.unera.social.model.User
 import kotlinx.coroutines.delay
 
-private const val DEFAULT_MUSIC_COVER = "https://media.unera.social/task_01kftb3024ed7bm84gy6j485fh_1769336848_img_0.webp"
+private const val DEFAULT_MUSIC_COVER = "https://media.featheredsocial.site/task_01kftb3024ed7bm84gy6j485fh_1769336848_img_0.webp"
 
 enum class MusicView {
     MUSIC,
@@ -61,10 +66,14 @@ fun MusicSystemScreen(
     trackPlays: Map<String, Long>,
     uploadProgress: Int?,
     uploadStatus: String?,
+    isLoading: Boolean = false,
+    onRefresh: () -> Unit = {},
     onPlayTrack: (AudioTrack) -> Unit,
     onTogglePlay: () -> Unit,
     onToggleLikeTrack: (String) -> Unit,
     onUploadSong: (title: String, artist: String, genre: String, album: String, coverUrl: String, audioUrl: String) -> Unit,
+    onPublishSingle: ((title: String, artist: String, genre: String, album: String, coverUri: Uri, audioUri: Uri) -> Unit)? = null,
+    onPublishAlbum: ((albumTitle: String, artist: String, genre: String, sharedCoverUri: Uri, tracks: List<AlbumTrackInput>) -> Unit)? = null,
     onDeleteUploadedSong: (String) -> Unit,
     onProfileClick: (Long) -> Unit,
     onBack: () -> Unit,
@@ -312,6 +321,8 @@ fun MusicSystemScreen(
                                 searchQuery = ""
                             }
                         },
+                        isLoading = isLoading,
+                        onRefresh = onRefresh,
                         onPlaySong = { playSongItem(it) },
                         onTogglePlay = onTogglePlay,
                         onToggleLikeSong = { onToggleLikeTrack(it.id) },
@@ -377,6 +388,18 @@ fun MusicSystemScreen(
                         onSubmitUpload = { title, artist, genre, album, cover, audio ->
                             onUploadSong(title, artist, genre, album, cover, audio)
                             activeView = MusicView.DASHBOARD
+                        },
+                        onPublishSingle = onPublishSingle?.let { publishFn ->
+                            { title, artist, genre, album, coverUri, audioUri ->
+                                publishFn(title, artist, genre, album, coverUri, audioUri)
+                                activeView = MusicView.DASHBOARD
+                            }
+                        },
+                        onPublishAlbum = onPublishAlbum?.let { publishFn ->
+                            { albumTitle, artist, genre, coverUri, tracks ->
+                                publishFn(albumTitle, artist, genre, coverUri, tracks)
+                                activeView = MusicView.DASHBOARD
+                            }
                         }
                     )
                 }
@@ -417,6 +440,8 @@ private fun MusicFeedContent(
     isPlaying: Boolean,
     likedTrackKeys: Set<String>,
     trackPlays: Map<String, Long>,
+    isLoading: Boolean = false,
+    onRefresh: () -> Unit = {},
     onSearchQueryChange: (String) -> Unit,
     onSelectGenre: (String) -> Unit,
     onPlaySong: (Song) -> Unit,
@@ -650,6 +675,89 @@ private fun MusicFeedContent(
                     onToggleLike = { onToggleLikeSong(song) },
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
+            }
+        } else if (allSongs.isEmpty()) {
+            item {
+                Surface(
+                    color = Color(0xFF0F172A),
+                    shape = RoundedCornerShape(20.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 24.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                color = Color(0xFF1877F2),
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text("Loading music catalog...", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(68.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF1877F2).copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    tint = Color(0xFF1877F2),
+                                    modifier = Modifier.size(34.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "No Songs Available Yet",
+                                color = Color.White,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Be the first creator to distribute your music to the Feathered community!",
+                                color = Color(0xFF94A3B8),
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(20.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Button(
+                                    onClick = onOpenStudio,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF1877F2),
+                                        contentColor = Color.White
+                                    )
+                                ) {
+                                    Icon(imageVector = Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Creator Studio", fontWeight = FontWeight.Bold)
+                                }
+                                OutlinedButton(
+                                    onClick = onRefresh,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = Color.White
+                                    )
+                                ) {
+                                    Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Refresh")
+                                }
+                            }
+                        }
+                    }
+                }
             }
         } else {
             // Horizontal Music Row: Trending
@@ -1768,24 +1876,55 @@ private fun UploadSongStudio(
     uploadProgress: Int?,
     uploadStatus: String?,
     onBack: () -> Unit,
-    onSubmitUpload: (title: String, artist: String, genre: String, album: String, coverUrl: String, audioUrl: String) -> Unit
+    onSubmitUpload: (title: String, artist: String, genre: String, album: String, coverUrl: String, audioUrl: String) -> Unit,
+    onPublishSingle: ((title: String, artist: String, genre: String, album: String, coverUri: Uri, audioUri: Uri) -> Unit)? = null,
+    onPublishAlbum: ((albumTitle: String, artist: String, genre: String, sharedCoverUri: Uri, tracks: List<AlbumTrackInput>) -> Unit)? = null
 ) {
     var mode by remember { mutableStateOf("single") } // "single" vs "album"
     var artistName by remember { mutableStateOf(currentUser.name) }
     var genre by remember { mutableStateOf("Afrobeats") }
-    var coverUrl by remember { mutableStateOf("https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600") }
+    var selectedCoverUri by remember { mutableStateOf<Uri?>(null) }
     var songTitle by remember { mutableStateOf("") }
-    var albumTitle by remember { mutableStateOf("") }
-    var albumTracks by remember { mutableStateOf(listOf("Track 1 - Intro", "Track 2 - Summer Vibe")) }
-    var newTrackInput by remember { mutableStateOf("") }
+    var singleAudioUri by remember { mutableStateOf<Uri?>(null) }
+    var singleAudioName by remember { mutableStateOf<String?>(null) }
 
-    val sampleCovers = listOf(
-        "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600",
-        "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600",
-        "https://images.unsplash.com/photo-1514525253440-b393452e8d26?w=600",
-        "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600",
-        "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=600"
-    )
+    // Album mode states
+    var albumTitle by remember { mutableStateOf("") }
+    var albumTracksList by remember { mutableStateOf(listOf<AlbumTrackInput>()) }
+    var pendingTrackTitle by remember { mutableStateOf("") }
+    var pendingTrackAudioUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingTrackAudioName by remember { mutableStateOf<String?>(null) }
+
+    var formError by remember { mutableStateOf<String?>(null) }
+
+    val coverPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            selectedCoverUri = uri
+            formError = null
+        }
+    }
+
+    val singleAudioPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            singleAudioUri = uri
+            singleAudioName = uri.lastPathSegment?.substringAfterLast('/') ?: "audio_track.mp3"
+            formError = null
+        }
+    }
+
+    val albumTrackAudioPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            pendingTrackAudioUri = uri
+            pendingTrackAudioName = uri.lastPathSegment?.substringAfterLast('/') ?: "audio_track.mp3"
+            formError = null
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -1860,7 +1999,10 @@ private fun UploadSongStudio(
                             .padding(4.dp)
                     ) {
                         Button(
-                            onClick = { mode = "single" },
+                            onClick = {
+                                mode = "single"
+                                formError = null
+                            },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (mode == "single") Color(0xFF1877F2) else Color.Transparent,
                                 contentColor = if (mode == "single") Color.White else Color(0xFF888888)
@@ -1872,7 +2014,10 @@ private fun UploadSongStudio(
                         }
 
                         Button(
-                            onClick = { mode = "album" },
+                            onClick = {
+                                mode = "album"
+                                formError = null
+                            },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (mode == "album") Color(0xFF1877F2) else Color.Transparent,
                                 contentColor = if (mode == "album") Color.White else Color(0xFF888888)
@@ -1910,7 +2055,7 @@ private fun UploadSongStudio(
                     OutlinedTextField(
                         value = genre,
                         onValueChange = { genre = it },
-                        placeholder = { Text("Pop, Hip Hop, Bongo Fleva, Amapiano...") },
+                        placeholder = { Text("Afrobeats, Bongo Fleva, Amapiano, Hip Hop...", color = Color(0xFF6B7280)) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -1923,42 +2068,113 @@ private fun UploadSongStudio(
                         )
                     )
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                    Text("COVER ARTWORK", color = Color(0xFF888888), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(6.dp))
+                    // MANDATORY COVER ARTWORK SECTION
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        sampleCovers.forEach { sampleUrl ->
-                            val isChosen = coverUrl == sampleUrl
-                            Box(
+                        Text("COVER ARTWORK", color = Color(0xFF888888), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("* MANDATORY", color = Color(0xFFEF4444), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (selectedCoverUri != null) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFF070D1D))
+                                .border(1.dp, Color(0xFF10B981), RoundedCornerShape(12.dp))
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            AsyncImage(
+                                model = selectedCoverUri,
+                                contentDescription = "Cover preview",
                                 modifier = Modifier
-                                    .size(54.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .border(2.dp, if (isChosen) Color(0xFF1877F2) else Color.Transparent, RoundedCornerShape(8.dp))
-                                    .clickable { coverUrl = sampleUrl }
+                                    .size(72.dp)
+                                    .clip(RoundedCornerShape(10.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Artwork Ready", color = Color(0xFF10B981), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text("Will be auto-compressed to 900x900 WebP for optimal streaming", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                OutlinedButton(
+                                    onClick = {
+                                        coverPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8))
+                                ) {
+                                    Text("Change Artwork", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    } else {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.5.dp, Color(0xFFEF4444).copy(alpha = 0.7f), RoundedCornerShape(12.dp))
+                                .clickable {
+                                    coverPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                },
+                            color = Color(0xFF070D1D)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
                             ) {
-                                AsyncImage(
-                                    model = sampleUrl,
-                                    contentDescription = null,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFEF4444).copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AddPhotoAlternate,
+                                        contentDescription = "Upload Cover",
+                                        tint = Color(0xFFEF4444),
+                                        modifier = Modifier.size(26.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = "Upload Cover Artwork *",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Cover photo is required to publish music on F-Music",
+                                    color = Color(0xFFEF4444).copy(alpha = 0.9f),
+                                    fontSize = 12.sp,
+                                    textAlign = TextAlign.Center
                                 )
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(18.dp))
 
                     if (mode == "single") {
                         Text("SONG TITLE", color = Color(0xFF888888), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(6.dp))
                         OutlinedTextField(
                             value = songTitle,
-                            onValueChange = { songTitle = it },
-                            placeholder = { Text("Enter track name...") },
+                            onValueChange = {
+                                songTitle = it
+                                formError = null
+                            },
+                            placeholder = { Text("Enter track title...", color = Color(0xFF6B7280)) },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(10.dp),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -1970,13 +2186,110 @@ private fun UploadSongStudio(
                                 unfocusedBorderColor = Color(0xFF1E293B)
                             )
                         )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // MANDATORY AUDIO FILE SECTION
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("AUDIO FILE", color = Color(0xFF888888), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("* MANDATORY", color = Color(0xFFEF4444), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        if (singleAudioUri != null) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFF070D1D))
+                                    .border(1.dp, Color(0xFF10B981), RoundedCornerShape(12.dp))
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF10B981).copy(alpha = 0.2f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Audiotrack,
+                                        contentDescription = null,
+                                        tint = Color(0xFF10B981),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Audio Track Attached", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text(
+                                        singleAudioName ?: "Selected audio file",
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = 11.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                OutlinedButton(
+                                    onClick = { singleAudioPicker.launch("audio/*") },
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8))
+                                ) {
+                                    Text("Change", fontSize = 12.sp)
+                                }
+                            }
+                        } else {
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .border(1.5.dp, Color(0xFF38BDF8).copy(alpha = 0.7f), RoundedCornerShape(12.dp))
+                                    .clickable { singleAudioPicker.launch("audio/*") },
+                                color = Color(0xFF070D1D)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF38BDF8).copy(alpha = 0.15f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.CloudUpload,
+                                            contentDescription = null,
+                                            tint = Color(0xFF38BDF8),
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Select Audio File *", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text("MP3, WAV, M4A or FLAC from device storage", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                                    }
+                                    Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF64748B))
+                                }
+                            }
+                        }
                     } else {
+                        // ALBUM MODE
                         Text("ALBUM NAME", color = Color(0xFF888888), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(6.dp))
                         OutlinedTextField(
                             value = albumTitle,
-                            onValueChange = { albumTitle = it },
-                            placeholder = { Text("Enter album name...") },
+                            onValueChange = {
+                                albumTitle = it
+                                formError = null
+                            },
+                            placeholder = { Text("Enter album name...", color = Color(0xFF6B7280)) },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(10.dp),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -1989,50 +2302,132 @@ private fun UploadSongStudio(
                             )
                         )
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                        Text("TRACKS IN ALBUM (${albumTracks.size})", color = Color(0xFF888888), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("TRACKS IN ALBUM (${albumTracksList.size})", color = Color(0xFF888888), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(6.dp))
-                        albumTracks.forEachIndexed { idx, track ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("${idx + 1}. $track", color = Color.White, fontSize = 13.sp)
-                                IconButton(
-                                    onClick = { albumTracks = albumTracks.filterIndexed { i, _ -> i != idx } },
-                                    modifier = Modifier.size(24.dp)
+
+                        if (albumTracksList.isEmpty()) {
+                            Text("No tracks added yet. Add at least one track below.", color = Color(0xFF64748B), fontSize = 12.sp)
+                        } else {
+                            albumTracksList.forEachIndexed { idx, track ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFF070D1D))
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(imageVector = Icons.Default.Close, contentDescription = "Remove", tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("${idx + 1}.", color = Color(0xFF1877F2), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                        Text(track.title, color = Color.White, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                    IconButton(
+                                        onClick = { albumTracksList = albumTracksList.filterIndexed { i, _ -> i != idx } },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(imageVector = Icons.Default.Close, contentDescription = "Remove", tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
+                                    }
                                 }
                             }
                         }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Add Track to Album Box
+                        Surface(
+                            color = Color(0xFF070D1D),
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B)),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            OutlinedTextField(
-                                value = newTrackInput,
-                                onValueChange = { newTrackInput = it },
-                                placeholder = { Text("New track title...") },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(8.dp),
-                                singleLine = true
-                            )
-                            Button(
-                                onClick = {
-                                    if (newTrackInput.isNotBlank()) {
-                                        albumTracks = albumTracks + newTrackInput.trim()
-                                        newTrackInput = ""
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text("Add Track to Album", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    value = pendingTrackTitle,
+                                    onValueChange = { pendingTrackTitle = it },
+                                    placeholder = { Text("Track title...", color = Color(0xFF6B7280)) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp),
+                                    singleLine = true
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedButton(
+                                        onClick = { albumTrackAudioPicker.launch("audio/*") },
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f),
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            contentColor = if (pendingTrackAudioUri != null) Color(0xFF10B981) else Color(0xFF38BDF8)
+                                        )
+                                    ) {
+                                        Icon(
+                                            imageVector = if (pendingTrackAudioUri != null) Icons.Default.Check else Icons.Default.AudioFile,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            if (pendingTrackAudioUri != null) pendingTrackAudioName ?: "Audio Selected" else "Choose Audio *",
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                    Button(
+                                        onClick = {
+                                            if (pendingTrackTitle.isNotBlank() && pendingTrackAudioUri != null) {
+                                                albumTracksList = albumTracksList + AlbumTrackInput(
+                                                    title = pendingTrackTitle.trim(),
+                                                    audioUri = pendingTrackAudioUri!!,
+                                                    artist = artistName.trim().ifBlank { currentUser.name }
+                                                )
+                                                pendingTrackTitle = ""
+                                                pendingTrackAudioUri = null
+                                                pendingTrackAudioName = null
+                                                formError = null
+                                            } else {
+                                                formError = "Please enter track title and select an audio file"
+                                            }
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2))
+                                    ) {
+                                        Text("Add Track", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                     }
                                 }
+                            }
+                        }
+                    }
+
+                    // Form error banner
+                    if (formError != null) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Surface(
+                            color = Color(0xFFEF4444).copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF4444)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text("Add")
+                                Icon(imageVector = Icons.Default.ErrorOutline, contentDescription = null, tint = Color(0xFFEF4444), modifier = Modifier.size(18.dp))
+                                Text(formError!!, color = Color(0xFFEF4444), fontSize = 12.sp, fontWeight = FontWeight.Medium)
                             }
                         }
                     }
@@ -2041,16 +2436,71 @@ private fun UploadSongStudio(
 
                     Button(
                         onClick = {
-                            val finalTitle = if (mode == "single") songTitle.ifBlank { "New Single" } else albumTracks.firstOrNull() ?: "New Track"
-                            val finalAlbum = if (mode == "single") "Single" else albumTitle.ifBlank { "New Album" }
-                            onSubmitUpload(
-                                finalTitle,
-                                artistName.ifBlank { currentUser.name },
-                                genre,
-                                finalAlbum,
-                                coverUrl,
-                                "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-                            )
+                            // STRICT VALIDATION: Cover Artwork is MANDATORY
+                            if (selectedCoverUri == null) {
+                                formError = "Cover artwork is mandatory! Please upload a cover image before publishing."
+                                return@Button
+                            }
+
+                            if (mode == "single") {
+                                if (songTitle.isBlank()) {
+                                    formError = "Please enter a title for your single."
+                                    return@Button
+                                }
+                                if (singleAudioUri == null) {
+                                    formError = "Audio file is mandatory! Please attach an audio file."
+                                    return@Button
+                                }
+
+                                if (onPublishSingle != null) {
+                                    onPublishSingle(
+                                        songTitle.trim(),
+                                        artistName.trim().ifBlank { currentUser.name },
+                                        genre.trim().ifBlank { "Afrobeats" },
+                                        "Single",
+                                        selectedCoverUri!!,
+                                        singleAudioUri!!
+                                    )
+                                } else {
+                                    onSubmitUpload(
+                                        songTitle.trim(),
+                                        artistName.trim().ifBlank { currentUser.name },
+                                        genre.trim().ifBlank { "Afrobeats" },
+                                        "Single",
+                                        selectedCoverUri.toString(),
+                                        singleAudioUri.toString()
+                                    )
+                                }
+                            } else {
+                                if (albumTitle.isBlank()) {
+                                    formError = "Please enter a title for your album."
+                                    return@Button
+                                }
+                                if (albumTracksList.isEmpty()) {
+                                    formError = "Please add at least one track with audio to publish the album."
+                                    return@Button
+                                }
+
+                                if (onPublishAlbum != null) {
+                                    onPublishAlbum(
+                                        albumTitle.trim(),
+                                        artistName.trim().ifBlank { currentUser.name },
+                                        genre.trim().ifBlank { "Afrobeats" },
+                                        selectedCoverUri!!,
+                                        albumTracksList
+                                    )
+                                } else {
+                                    val firstTrack = albumTracksList.first()
+                                    onSubmitUpload(
+                                        firstTrack.title,
+                                        artistName.trim().ifBlank { currentUser.name },
+                                        genre.trim().ifBlank { "Afrobeats" },
+                                        albumTitle.trim(),
+                                        selectedCoverUri.toString(),
+                                        firstTrack.audioUri.toString()
+                                    )
+                                }
+                            }
                         },
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
@@ -2063,7 +2513,11 @@ private fun UploadSongStudio(
                     ) {
                         Icon(imageVector = Icons.Default.CloudUpload, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Publish to F-Music", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (mode == "single") "Publish Single to F-Music" else "Publish Album (${albumTracksList.size} Tracks)",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }

@@ -1012,7 +1012,7 @@ fun LiveMusicPickerModal(
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     AsyncImage(
-                                        model = song.cover.ifBlank { "https://media.unera.social/task_01kftb3024ed7bm84gy6j485fh_1769336848_img_0.webp" },
+                                        model = song.cover.ifBlank { "https://media.featheredsocial.site/task_01kftb3024ed7bm84gy6j485fh_1769336848_img_0.webp" },
                                         contentDescription = song.title,
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier

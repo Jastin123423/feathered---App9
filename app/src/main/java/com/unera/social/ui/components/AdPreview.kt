@@ -412,9 +412,10 @@ fun AdPreview(
             }
 
             // Ad Description
-            if (data.description.isNotBlank()) {
+            val cleanDesc = data.description.trim().let { if (it.equals("null", ignoreCase = true) || it.equals("undefined", ignoreCase = true)) "" else it }
+            if (cleanDesc.isNotBlank()) {
                 Text(
-                    text = data.description,
+                    text = cleanDesc,
                     fontSize = 14.sp,
                     color = Color(0xFF27272A),
                     lineHeight = 20.sp,

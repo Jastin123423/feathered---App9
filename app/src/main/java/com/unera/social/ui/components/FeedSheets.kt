@@ -276,15 +276,23 @@ fun ReactionsSheetDialog(
     onDismiss: () -> Unit,
     onUserClick: (User) -> Unit
 ) {
+    var liveReactions by remember(post.id) { mutableStateOf(post.reactions) }
     var selectedTab by remember { mutableStateOf("all") }
 
-    val reactionTypes = remember(post.reactions) {
-        post.reactions.map { it.type }.distinct()
+    LaunchedEffect(post.id) {
+        val (fetched, _) = FeedInteractionApiService.fetchReactions(post, 0L)
+        if (fetched.isNotEmpty()) {
+            liveReactions = fetched
+        }
     }
 
-    val filteredReactions = remember(selectedTab, post.reactions) {
-        if (selectedTab == "all") post.reactions
-        else post.reactions.filter { it.type == selectedTab }
+    val reactionTypes = remember(liveReactions) {
+        liveReactions.map { it.type }.distinct()
+    }
+
+    val filteredReactions = remember(selectedTab, liveReactions) {
+        if (selectedTab == "all") liveReactions
+        else liveReactions.filter { it.type == selectedTab }
     }
 
     Dialog(
@@ -335,7 +343,7 @@ fun ReactionsSheetDialog(
                         FilterChip(
                             selected = selectedTab == "all",
                             onClick = { selectedTab = "all" },
-                            label = { Text("All ${post.reactions.size}") },
+                            label = { Text("All ${liveReactions.size}") },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = Color(0xFF1877F2),
                                 selectedLabelColor = Color.White,
@@ -346,7 +354,7 @@ fun ReactionsSheetDialog(
                     }
 
                     items(reactionTypes) { type ->
-                        val count = post.reactions.count { it.type == type }
+                        val count = liveReactions.count { it.type == type }
                         FilterChip(
                             selected = selectedTab == type,
                             onClick = { selectedTab = type },
@@ -669,6 +677,7 @@ fun DiscussionsSheetDialog(
     onAddComment: (String) -> Unit,
     onLikeComment: (Long) -> Unit,
     onDeleteComment: ((Long) -> Unit)? = null,
+    onToggleHideComment: ((Long, Boolean) -> Unit)? = null,
     onProfileClick: ((User) -> Unit)? = null,
     onLikePost: (() -> Unit)? = null,
     onReactPost: ((String) -> Unit)? = null,
@@ -682,6 +691,7 @@ fun DiscussionsSheetDialog(
     isFollowing: Boolean = false,
     onFollowToggle: (() -> Unit)? = null
 ) {
+    val coroutineScope = rememberCoroutineScope()
     var postState by remember(post) { mutableStateOf(post) }
     var newCommentText by remember { mutableStateOf("") }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
@@ -893,9 +903,19 @@ fun DiscussionsSheetDialog(
                         }
                     } else {
                         items(liveComments, key = { it.id }) { comment ->
+                            val canDeleteComment = currentUser.role in listOf("admin", "moderator") || comment.author.id == currentUser.id
+                            val itemType = when {
+                                post.postType == "group_post" || post.groupId != null -> "group_post"
+                                post.song != null || post.postType in listOf("song", "music") -> "song"
+                                post.product != null || post.postType in listOf("product", "marketplace") -> "product"
+                                post.event != null || post.postType == "event" -> "event"
+                                post.story != null || post.postType == "story" -> "story"
+                                else -> "post"
+                            }
                             Box(modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
                                 CommentItemRow(
                                     comment = comment,
+                                    canDelete = canDeleteComment,
                                     onLike = {
                                         liveComments = liveComments.map { c ->
                                             if (c.id == comment.id) {
@@ -903,6 +923,9 @@ fun DiscussionsSheetDialog(
                                                 val newCount = if (newLiked) c.likesCount + 1 else (c.likesCount - 1).coerceAtLeast(0)
                                                 c.copy(isLiked = newLiked, myReaction = if (newLiked) "like" else null, likesCount = newCount)
                                             } else c
+                                        }
+                                        coroutineScope.launch {
+                                            FeedInteractionApiService.likeComment(itemType, comment.id, currentUser.id)
                                         }
                                         onLikeComment(comment.id)
                                     },
@@ -914,9 +937,27 @@ fun DiscussionsSheetDialog(
                                                 c.copy(isLiked = true, myReaction = reactionType, likesCount = newCount)
                                             } else c
                                         }
+                                        coroutineScope.launch {
+                                            FeedInteractionApiService.likeComment(itemType, comment.id, currentUser.id)
+                                        }
                                         onLikeComment(comment.id)
                                     },
                                     onReply = { replyingTo = comment.author.name },
+                                    onToggleHide = {
+                                        val newHidden = !comment.isHidden
+                                        liveComments = liveComments.map { if (it.id == comment.id) it.copy(isHidden = newHidden) else it }
+                                        coroutineScope.launch {
+                                            FeedInteractionApiService.hideComment(itemType, comment.id, currentUser.id, post.id, if (newHidden) "hide" else "unhide")
+                                        }
+                                        onToggleHideComment?.invoke(comment.id, newHidden)
+                                    },
+                                    onDelete = {
+                                        liveComments = liveComments.filter { it.id != comment.id }
+                                        coroutineScope.launch {
+                                            FeedInteractionApiService.deleteComment(itemType, comment.id, currentUser.id, post.id)
+                                        }
+                                        onDeleteComment?.invoke(comment.id)
+                                    },
                                     onMoreOptions = { selectedCommentForActions = comment },
                                     onUserClick = { onProfileClick?.invoke(comment.author) }
                                 )
@@ -1108,15 +1149,47 @@ fun DiscussionsSheetDialog(
 
         // Comment Action Modal
         selectedCommentForActions?.let { c ->
+            val itemType = when {
+                post.postType == "group_post" || post.groupId != null -> "group_post"
+                post.song != null || post.postType in listOf("song", "music") -> "song"
+                post.product != null || post.postType in listOf("product", "marketplace") -> "product"
+                post.event != null || post.postType == "event" -> "event"
+                post.story != null || post.postType == "story" -> "story"
+                else -> "post"
+            }
             CommentActionModal(
                 isOpen = true,
                 onClose = { selectedCommentForActions = null },
                 comment = c,
                 currentUserId = currentUser.id,
                 isAdmin = currentUser.role in listOf("admin", "moderator"),
+                onToggleHide = { commentId ->
+                    val newHidden = !c.isHidden
+                    liveComments = liveComments.map { if (it.id == commentId) it.copy(isHidden = newHidden) else it }
+                    coroutineScope.launch {
+                        FeedInteractionApiService.hideComment(
+                            itemType = itemType,
+                            commentId = commentId,
+                            userId = currentUser.id,
+                            parentId = post.id,
+                            action = if (newHidden) "hide" else "unhide"
+                        )
+                    }
+                    onToggleHideComment?.invoke(commentId, newHidden)
+                    selectedCommentForActions = null
+                },
                 onDelete = { commentId ->
                     liveComments = liveComments.filter { it.id != commentId }
+                    coroutineScope.launch {
+                        FeedInteractionApiService.deleteComment(
+                            itemType = itemType,
+                            commentId = commentId,
+                            userId = currentUser.id,
+                            parentId = post.id
+                        )
+                    }
                     onDeleteComment?.invoke(commentId)
+                    selectedCommentForActions = null
                 },
                 onReply = { comment ->
                     replyingTo = comment.author.name
@@ -1129,9 +1202,12 @@ fun DiscussionsSheetDialog(
 @Composable
 private fun CommentItemRow(
     comment: Comment,
+    canDelete: Boolean = false,
     onLike: () -> Unit,
     onReact: (String) -> Unit = {},
     onReply: () -> Unit,
+    onToggleHide: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
     onMoreOptions: (() -> Unit)? = null,
     onUserClick: (() -> Unit)? = null
 ) {
@@ -1177,6 +1253,17 @@ private fun CommentItemRow(
                             if (comment.author.isVerified) {
                                 Spacer(modifier = Modifier.width(4.dp))
                                 VerifiedBadge(size = 13.dp)
+                            }
+                            if (comment.isHidden) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Color(0xFF334155))
+                                        .padding(horizontal = 5.dp, vertical = 1.dp)
+                                ) {
+                                    Text("Hidden", fontSize = 10.sp, color = Color(0xFF94A3B8), fontWeight = FontWeight.SemiBold)
+                                }
                             }
                         }
 
@@ -1286,6 +1373,26 @@ private fun CommentItemRow(
                     color = Color(0xFF94A3B8),
                     modifier = Modifier.clickable(onClick = onReply)
                 )
+
+                if (onToggleHide != null) {
+                    Text(
+                        text = if (comment.isHidden) "Unhide" else "Hide",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (comment.isHidden) Color(0xFF38BDF8) else Color(0xFF94A3B8),
+                        modifier = Modifier.clickable(onClick = onToggleHide)
+                    )
+                }
+
+                if (canDelete && onDelete != null) {
+                    Text(
+                        text = "Delete",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFEF4444),
+                        modifier = Modifier.clickable(onClick = onDelete)
+                    )
+                }
 
                 if (onMoreOptions != null) {
                     Text(
