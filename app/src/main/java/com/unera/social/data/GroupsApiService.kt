@@ -875,6 +875,9 @@ object GroupsApiService {
         val applicationType = obj.optString("application_type").takeIf { it.isNotBlank() && it != "null" }
         val applicationValue = obj.optString("application_value").takeIf { it.isNotBlank() && it != "null" }
         val expiryDate = obj.optString("expiry_date").takeIf { it.isNotBlank() && it != "null" }
+        val backgroundStyle = obj.optString("colours").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("background_style").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("background").takeIf { it.isNotBlank() && it != "null" }
 
         val likesCount = obj.optInt("reactions_count", obj.optInt("likes_count", 0))
         val commentsCount = obj.optInt("comments_count", 0)
@@ -905,7 +908,8 @@ object GroupsApiService {
             salary = salary,
             applicationType = applicationType,
             applicationValue = applicationValue,
-            expiryDate = expiryDate
+            expiryDate = expiryDate,
+            backgroundStyle = backgroundStyle
         )
     }
 

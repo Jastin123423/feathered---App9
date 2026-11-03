@@ -79,6 +79,7 @@ data class GroupPost(
     val applicationType: String? = null, // "email", "link"
     val applicationValue: String? = null,
     val expiryDate: String? = null,
+    val backgroundStyle: String? = null,
     val comments: List<Comment> = emptyList()
 )
 
