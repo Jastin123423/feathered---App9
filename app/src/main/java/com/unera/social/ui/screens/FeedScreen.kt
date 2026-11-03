@@ -23,6 +23,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -1067,11 +1068,16 @@ fun WebPostCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
+            .clipToBounds()
             .testTag("post_card_${post.id}"),
         shape = RoundedCornerShape(0.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A))
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clipToBounds()
+        ) {
             // Header: Author / Group / Ad info
             Row(
                 modifier = Modifier
@@ -1484,10 +1490,16 @@ fun WebPostCard(
                     )
                 } else if (mediaList.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(6.dp))
-                    MediaGrid(
-                        images = mediaList,
-                        onImageClick = { idx -> onOpenGallery(mediaList, idx) }
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clipToBounds()
+                    ) {
+                        MediaGrid(
+                            images = mediaList,
+                            onImageClick = { idx -> onOpenGallery(mediaList, idx) }
+                        )
+                    }
                 }
             }
 

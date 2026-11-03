@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -92,6 +93,7 @@ fun MediaGrid(
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .clipToBounds()
             .testTag("media_grid_${media.size}")
     ) {
         when (media.size) {
@@ -110,10 +112,12 @@ fun MediaGrid(
                     low = item.thumb ?: item.url
                 )
 
+                val clampedRatio = aspectRatio?.coerceIn(0.56f, 2.4f)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .wrapContentHeight()
+                        .heightIn(min = 160.dp, max = maxHeight)
+                        .clipToBounds()
                         .background(Color(0xFF050B18))
                         .clickable { handleClick(displayUrl, 0) }
                         .testTag("media_grid_item_0"),
@@ -125,10 +129,19 @@ fun MediaGrid(
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .fillMaxWidth()
+                            .heightIn(min = 160.dp, max = maxHeight)
                             .then(
-                                if (aspectRatio != null) Modifier.aspectRatio(aspectRatio)
-                                else Modifier.heightIn(min = 200.dp, max = maxHeight)
+                                if (clampedRatio != null) {
+                                    if (clampedRatio < 1f) {
+                                        Modifier.aspectRatio(clampedRatio, matchHeightConstraintsFirst = true)
+                                    } else {
+                                        Modifier.aspectRatio(clampedRatio)
+                                    }
+                                } else {
+                                    Modifier.heightIn(min = 160.dp, max = maxHeight)
+                                }
                             )
+                            .clipToBounds()
                     )
                 }
             }
@@ -138,6 +151,7 @@ fun MediaGrid(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clipToBounds()
                         .background(Color.Black),
                     horizontalArrangement = Arrangement.spacedBy(gap)
                 ) {
@@ -166,6 +180,7 @@ fun MediaGrid(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(420.dp)
+                        .clipToBounds()
                         .background(Color.Black),
                     horizontalArrangement = Arrangement.spacedBy(gap)
                 ) {
@@ -211,6 +226,7 @@ fun MediaGrid(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clipToBounds()
                         .background(Color.Black),
                     verticalArrangement = Arrangement.spacedBy(gap)
                 ) {
@@ -272,6 +288,7 @@ fun MediaGrid(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clipToBounds()
                         .background(Color.Black),
                     verticalArrangement = Arrangement.spacedBy(gap)
                 ) {
@@ -393,6 +410,7 @@ fun MediaGridTile(
 
     Box(
         modifier = modifier
+            .clipToBounds()
             .background(Color(0xFF162032))
             .clickable(onClick = onClick)
             .testTag("media_grid_item_$index")
@@ -401,7 +419,9 @@ fun MediaGridTile(
             urls = versions,
             contentDescription = item.alt ?: "Post image ${index + 1}",
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .clipToBounds()
         )
 
         if (extraCount > 0) {

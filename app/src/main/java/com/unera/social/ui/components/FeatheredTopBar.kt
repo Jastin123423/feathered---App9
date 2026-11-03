@@ -119,15 +119,16 @@ fun FeatheredTopBar(
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
                                     .offset(x = 2.dp, y = (-2).dp)
+                                    .defaultMinSize(minWidth = 19.dp, minHeight = 19.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFFF97316))
-                                    .border(1.5.dp, Color(0xFF0F172A), CircleShape)
-                                    .padding(horizontal = 4.dp, vertical = 1.dp),
+                                    .background(Color(0xFFE41E3F))
+                                    .border(1.5.dp, Color(0xFF0B1120), CircleShape)
+                                    .padding(horizontal = if (badgeStr.length > 1) 4.5.dp else 0.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = badgeStr,
-                                    fontSize = 9.sp,
+                                    fontSize = 10.sp,
                                     fontWeight = FontWeight.Black,
                                     color = Color.White
                                 )
@@ -183,16 +184,16 @@ fun FeatheredTopBar(
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
                                     .offset(x = 2.dp, y = (-2).dp)
-                                    .sizeIn(minWidth = 18.dp, minHeight = 18.dp)
+                                    .defaultMinSize(minWidth = 19.dp, minHeight = 19.dp)
                                     .clip(CircleShape)
                                     .background(Color(0xFFE41E3F))
-                                    .border(1.5.dp, Color(0xFF0F172A), CircleShape)
-                                    .padding(horizontal = 4.dp, vertical = 1.dp),
+                                    .border(1.5.dp, Color(0xFF0B1120), CircleShape)
+                                    .padding(horizontal = if (badgeStr.length > 1) 4.5.dp else 0.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = badgeStr,
-                                    fontSize = 9.sp,
+                                    fontSize = 10.sp,
                                     fontWeight = FontWeight.Black,
                                     color = Color.White
                                 )

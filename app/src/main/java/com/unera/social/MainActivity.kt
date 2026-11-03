@@ -5,15 +5,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.Dialog
@@ -37,6 +38,7 @@ import com.unera.social.ui.components.ImageViewer
 import com.unera.social.ui.components.ProfessionalLoader
 import com.unera.social.ui.components.Spinner
 import com.unera.social.ui.components.DiscussionsSheetDialog
+import com.unera.social.ui.components.FacebookSplashScreen
 import com.unera.social.ui.screens.*
 import com.unera.social.ui.theme.FeatheredTheme
 import kotlinx.coroutines.launch
@@ -66,8 +68,10 @@ fun FeatheredApp(
     val scrollRestorationController = remember { ScrollRestorationController() }
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
+    var showSplash by remember { mutableStateOf(true) }
 
-    ProvideScrollRestoration(controller = scrollRestorationController) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        ProvideScrollRestoration(controller = scrollRestorationController) {
         ScrollRestoration(
             currentRoute = uiState.currentScreen,
             controller = scrollRestorationController
@@ -1007,6 +1011,19 @@ fun FeatheredApp(
     if (uiState.isAppLoading) {
         ProfessionalLoader()
     }
+        }
+
+        // Facebook/Meta 1:1 launch splash screen
+        AnimatedVisibility(
+            visible = showSplash,
+            enter = fadeIn(),
+            exit = fadeOut(animationSpec = tween(durationMillis = 350))
+        ) {
+            FacebookSplashScreen(
+                isLoading = uiState.isFeedLoading,
+                onFinished = { showSplash = false }
+            )
+        }
     }
 }
 

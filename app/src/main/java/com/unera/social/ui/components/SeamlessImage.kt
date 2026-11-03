@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
@@ -136,13 +137,13 @@ fun SeamlessImage(
         label = "overlayAlpha"
     )
 
-    val effectiveRatio = aspectRatio ?: detectedRatio
     val containerModifier = modifier
         .then(
-            if (effectiveRatio != null) Modifier.aspectRatio(effectiveRatio)
-            else Modifier.heightIn(min = 120.dp)
+            if (aspectRatio != null) Modifier.aspectRatio(aspectRatio)
+            else Modifier
         )
         .clip(shape)
+        .clipToBounds()
         .background(Color(0xFF0A0F1D))
 
     Box(modifier = containerModifier) {
@@ -199,6 +200,7 @@ fun SeamlessImage(
                 },
                 modifier = Modifier
                     .fillMaxSize()
+                    .clipToBounds()
                     .alpha(if (isHighLoaded) highAlpha else 0f)
             )
         }
