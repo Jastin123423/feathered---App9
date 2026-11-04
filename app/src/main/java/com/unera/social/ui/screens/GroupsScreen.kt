@@ -68,6 +68,7 @@ import androidx.compose.ui.platform.testTag
 import com.unera.social.ui.components.DiscussButton
 import com.unera.social.ui.components.FacebookReactionButton
 import com.unera.social.ui.components.REACTION_EMOJIS
+import com.unera.social.ui.components.TextPostBackgroundView
 import com.unera.social.ui.components.getReactionEmoji
 
 fun isCareerCategory(category: String?, name: String? = null): Boolean {
@@ -1847,11 +1848,17 @@ fun GroupPostCard(
                 }
             }
 
-            // Text Content (with See More / See Less)
+            // Text Content (with See More / See Less or Animated/Styled Background)
             val cleanContent = remember(post.content) {
                 post.content.trim().let { if (it.equals("null", ignoreCase = true) || it.equals("undefined", ignoreCase = true)) "" else it }
             }
-            if (cleanContent.isNotBlank()) {
+            if (!post.backgroundStyle.isNullOrBlank() && cleanContent.isNotBlank() && post.imageUrls.isEmpty() && post.videoUrl.isNullOrBlank()) {
+                TextPostBackgroundView(
+                    backgroundStyle = post.backgroundStyle,
+                    content = cleanContent,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else if (cleanContent.isNotBlank()) {
                 val words = remember(cleanContent) { cleanContent.split("\\s+".toRegex()).filter { it.isNotEmpty() } }
                 val isLong = words.size > 25 || cleanContent.length > 180
                 val displayText = if (isExpandedText || !isLong) cleanContent else words.take(25).joinToString(" ") + "…"

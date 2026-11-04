@@ -761,8 +761,8 @@ private fun DrawScope.drawFantasyFairy(w: Float, h: Float, progress: Float, fast
     for (i in 0..15) {
         val seed = i * 23.3f
         val t = (fast + (seed % 1f)) % 1f
-        val dx = fx - t * 80f + sin(t * 4 * PI + seed) * 18f
-        val dy = fy + t * 40f + cos(t * 3 * PI + seed) * 14f
+        val dx = (fx - t * 80f + sin(t * 4 * PI + seed) * 18f).toFloat()
+        val dy = (fy + t * 40f + cos(t * 3 * PI + seed) * 14f).toFloat()
         drawCircle(color = Color(0xFFFACC15).copy(alpha = (1f - t) * 0.8f), center = Offset(dx, dy), radius = 2.5f)
     }
 }

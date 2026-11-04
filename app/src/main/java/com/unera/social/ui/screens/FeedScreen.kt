@@ -1367,33 +1367,12 @@ fun WebPostCard(
                     }
                 }
             } else if (!post.backgroundStyle.isNullOrBlank() && post.content.isNotBlank()) {
-                // Colored full bleed text post
-                val gradientColors = remember(post.backgroundStyle) {
-                    when {
-                        post.backgroundStyle.contains("#FF0057") -> listOf(Color(0xFFFF0057), Color(0xFFE64C4C))
-                        post.backgroundStyle.contains("#a8ff78") -> listOf(Color(0xFF00B4D8), Color(0xFF0077B6))
-                        post.backgroundStyle.contains("#e65c00") -> listOf(Color(0xFFE65C00), Color(0xFFF9D423))
-                        else -> listOf(Color(0xFF1877F2), Color(0xFF0055FF))
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 260.dp)
-                        .background(Brush.linearGradient(gradientColors))
-                        .padding(28.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = post.content,
-                        color = Color.White,
-                        fontSize = 23.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        textAlign = TextAlign.Center,
-                        lineHeight = 34.sp
-                    )
-                }
+                // Text post with animated or styled background
+                TextPostBackgroundView(
+                    backgroundStyle = post.backgroundStyle,
+                    content = post.content,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
 
             // Special Post: Job Posting
