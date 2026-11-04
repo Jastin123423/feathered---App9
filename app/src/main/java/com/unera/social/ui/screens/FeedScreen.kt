@@ -1325,7 +1325,11 @@ fun WebPostCard(
                     (post.product != null && (cleanContent.equals(post.product.title, ignoreCase = true) || cleanContent.equals(post.product.description, ignoreCase = true))) ||
                     (post.song != null && cleanContent.contains(post.song.title, ignoreCase = true))
 
-            if (!isDuplicateText && cleanContent.isNotBlank() && post.backgroundStyle.isNullOrBlank()) {
+            val hasBackground = !post.backgroundStyle.isNullOrBlank() &&
+                    !post.backgroundStyle.equals("none", ignoreCase = true) &&
+                    !post.backgroundStyle.equals("null", ignoreCase = true)
+
+            if (!isDuplicateText && cleanContent.isNotBlank() && !hasBackground) {
                 val words = remember(cleanContent) {
                     cleanContent.split(Regex("\\s+")).filter { it.isNotBlank() }
                 }
@@ -1366,11 +1370,11 @@ fun WebPostCard(
                         }
                     }
                 }
-            } else if (!post.backgroundStyle.isNullOrBlank() && post.content.isNotBlank()) {
+            } else if (hasBackground && cleanContent.isNotBlank()) {
                 // Text post with animated or styled background
                 TextPostBackgroundView(
                     backgroundStyle = post.backgroundStyle,
-                    content = post.content,
+                    content = cleanContent,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -1467,7 +1471,7 @@ fun WebPostCard(
                     (post.mediaType == "video" && PostsApiService.isValidVideoUrl(post.mediaUrl)) ||
                     (post.mediaMeta.firstOrNull()?.type == "video" && PostsApiService.isValidVideoUrl(post.mediaMeta.firstOrNull()?.resolution720 ?: post.mediaMeta.firstOrNull()?.original))
 
-            if (post.product == null && post.event == null && post.sharedPost == null && (post.story == null && post.postType != "story")) {
+            if (post.product == null && post.event == null && post.sharedPost == null && (post.story == null && post.postType != "story") && !hasBackground) {
                 if (isPostVideo) {
                     val videoUrl = post.videoUrl ?: mediaList.firstOrNull() ?: ""
                     Spacer(modifier = Modifier.height(6.dp))

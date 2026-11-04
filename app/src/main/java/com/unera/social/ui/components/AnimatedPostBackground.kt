@@ -35,11 +35,17 @@ fun AnimatedPostBackground(
     isVisible: Boolean = true
 ) {
     val cleanId = remember(templateId) {
-        templateId.substringBefore("|").trim()
+        val stripped = templateId.trim().removeSurrounding("\"").replace("\\\"", "\"")
+        val firstPart = stripped.substringBefore("|").trim()
+        if (firstPart.startsWith("animated:")) firstPart else "animated:$firstPart"
+    }
+
+    val animKey = remember(cleanId) {
+        cleanId.removePrefix("animated:").trim().lowercase()
     }
 
     val template = remember(cleanId) {
-        findBackgroundTemplate(cleanId) ?: ALL_TEXT_POST_BACKGROUNDS[7] // fallback
+        findBackgroundTemplate(cleanId) ?: ALL_TEXT_POST_BACKGROUNDS[7] // fallback to blooming_rose
     }
 
     // Infinite animation loop (paused if isVisible is false for performance)
@@ -80,54 +86,54 @@ fun AnimatedPostBackground(
             .clipToBounds()
             .background(Brush.linearGradient(template.baseColors.ifEmpty { listOf(Color(0xFF1E1B4B), Color(0xFF311042)) }))
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
+        Canvas(modifier = Modifier.matchParentSize()) {
             val w = size.width
             val h = size.height
             if (w <= 0f || h <= 0f) return@Canvas
 
-            when (cleanId) {
+            when (animKey) {
                 // ==================== FLOWERS ====================
-                "animated:blooming_rose" -> drawBloomingRose(w, h, pulseProgress, animProgress)
-                "animated:cherry_blossom" -> drawCherryBlossom(w, h, animProgress)
-                "animated:sunflower_breeze" -> drawSunflowerBreeze(w, h, animProgress, pulseProgress)
-                "animated:wind_flowers" -> drawWindFlowers(w, h, animProgress)
-                "animated:golden_petals" -> drawGoldenPetals(w, h, animProgress)
+                "blooming_rose" -> drawBloomingRose(w, h, pulseProgress, animProgress)
+                "cherry_blossom" -> drawCherryBlossom(w, h, animProgress)
+                "sunflower_breeze" -> drawSunflowerBreeze(w, h, animProgress, pulseProgress)
+                "wind_flowers" -> drawWindFlowers(w, h, animProgress)
+                "golden_petals" -> drawGoldenPetals(w, h, animProgress)
 
                 // ==================== NATURE ====================
-                "animated:garden_butterflies" -> drawGardenButterflies(w, h, animProgress, fastProgress)
-                "animated:forest_fireflies" -> drawForestFireflies(w, h, animProgress, pulseProgress)
-                "animated:waterfall_mist" -> drawWaterfallMist(w, h, fastProgress)
+                "garden_butterflies" -> drawGardenButterflies(w, h, animProgress, fastProgress)
+                "forest_fireflies" -> drawForestFireflies(w, h, animProgress, pulseProgress)
+                "waterfall_mist" -> drawWaterfallMist(w, h, fastProgress)
 
                 // ==================== 3D CHARACTERS ====================
-                "animated:dancing_bear" -> drawDancingTeddyBear(w, h, fastProgress, pulseProgress)
-                "animated:dancing_panda" -> drawDancingPanda(w, h, fastProgress, pulseProgress)
-                "animated:bouncing_bunny" -> drawBouncingBunny(w, h, fastProgress, pulseProgress)
-                "animated:kawaii_kitty" -> drawKawaiiKitty(w, h, fastProgress, pulseProgress)
-                "animated:fantasy_fairy" -> drawFantasyFairy(w, h, animProgress, fastProgress)
+                "dancing_bear", "dancing_teddy" -> drawDancingTeddyBear(w, h, fastProgress, pulseProgress)
+                "dancing_panda", "happy_panda" -> drawDancingPanda(w, h, fastProgress, pulseProgress)
+                "bouncing_bunny", "cute_bunny" -> drawBouncingBunny(w, h, fastProgress, pulseProgress)
+                "kawaii_kitty" -> drawKawaiiKitty(w, h, fastProgress, pulseProgress)
+                "fantasy_fairy" -> drawFantasyFairy(w, h, animProgress, fastProgress)
 
                 // ==================== ROMANTIC ====================
-                "animated:floating_hearts" -> drawFloatingHearts(w, h, animProgress)
-                "animated:beating_heart" -> drawBeatingHeart(w, h, pulseProgress)
-                "animated:rose_petals_love" -> drawRosePetalsLove(w, h, animProgress)
-                "animated:romantic_glow" -> drawRomanticGlow(w, h, animProgress, pulseProgress)
+                "floating_hearts" -> drawFloatingHearts(w, h, animProgress)
+                "beating_heart" -> drawBeatingHeart(w, h, pulseProgress)
+                "rose_petals_love", "rose_petals_rain" -> drawRosePetalsLove(w, h, animProgress)
+                "romantic_glow" -> drawRomanticGlow(w, h, animProgress, pulseProgress)
 
                 // ==================== MAGICAL ====================
-                "animated:aurora_borealis" -> drawAuroraBorealis(w, h, animProgress)
-                "animated:cosmic_stars" -> drawCosmicStars(w, h, animProgress, fastProgress)
-                "animated:magical_orbs" -> drawMagicalOrbs(w, h, animProgress, pulseProgress)
-                "animated:fantasy_castle" -> drawFantasyCastle(w, h, animProgress, pulseProgress)
+                "aurora_borealis" -> drawAuroraBorealis(w, h, animProgress)
+                "cosmic_stars" -> drawCosmicStars(w, h, animProgress, fastProgress)
+                "magical_orbs" -> drawMagicalOrbs(w, h, animProgress, pulseProgress)
+                "fantasy_castle" -> drawFantasyCastle(w, h, animProgress, pulseProgress)
 
                 // ==================== CELEBRATION ====================
-                "animated:confetti_fiesta" -> drawConfettiFiesta(w, h, fastProgress)
-                "animated:rising_balloons" -> drawRisingBalloons(w, h, animProgress)
-                "animated:fireworks_night" -> drawFireworksNight(w, h, fastProgress)
-                "animated:birthday_sparkles" -> drawBirthdaySparkles(w, h, animProgress, pulseProgress)
+                "confetti_fiesta" -> drawConfettiFiesta(w, h, fastProgress)
+                "rising_balloons" -> drawRisingBalloons(w, h, animProgress)
+                "fireworks_night" -> drawFireworksNight(w, h, fastProgress)
+                "birthday_sparkles" -> drawBirthdaySparkles(w, h, animProgress, pulseProgress)
 
                 // ==================== ENVIRONMENTS ====================
-                "animated:ocean_fish" -> drawOceanFish(w, h, animProgress, fastProgress)
-                "animated:falling_snow" -> drawFallingSnow(w, h, animProgress)
-                "animated:gentle_rain" -> drawGentleRain(w, h, fastProgress)
-                "animated:sunset_clouds" -> drawSunsetClouds(w, h, animProgress)
+                "ocean_fish" -> drawOceanFish(w, h, animProgress, fastProgress)
+                "falling_snow" -> drawFallingSnow(w, h, animProgress)
+                "gentle_rain" -> drawGentleRain(w, h, fastProgress)
+                "sunset_clouds" -> drawSunsetClouds(w, h, animProgress)
 
                 else -> drawCosmicStars(w, h, animProgress, fastProgress)
             }
@@ -1247,14 +1253,18 @@ fun TextPostBackgroundView(
 ) {
     if (content.isBlank() && backgroundStyle.isNullOrBlank()) return
 
-    val cleanStyle = remember(backgroundStyle) { backgroundStyle?.trim() ?: "" }
+    val cleanStyle = remember(backgroundStyle) {
+        backgroundStyle?.trim()?.removeSurrounding("\"")?.replace("\\\"", "\"") ?: ""
+    }
     val styling = remember(cleanStyle) { TextPostStyling.parse(cleanStyle) }
-    val isAnimated = remember(cleanStyle) { cleanStyle.startsWith("animated:") }
+    val isAnimated = remember(cleanStyle) {
+        cleanStyle.contains("animated:") || findBackgroundTemplate(cleanStyle)?.isAnimated == true
+    }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 280.dp)
+            .heightIn(min = 320.dp)
             .clipToBounds()
             .then(if (onTextClick != null) Modifier.clickable { onTextClick() } else Modifier),
         contentAlignment = Alignment.Center
@@ -1263,7 +1273,7 @@ fun TextPostBackgroundView(
             // Render High-Fidelity Animated Background Scene
             AnimatedPostBackground(
                 templateId = cleanStyle,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.matchParentSize(),
                 isVisible = isVisible
             )
         } else {
@@ -1281,7 +1291,7 @@ fun TextPostBackgroundView(
             }
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .matchParentSize()
                     .background(Brush.linearGradient(gradientColors))
             )
         }
@@ -1289,39 +1299,45 @@ fun TextPostBackgroundView(
         // Automatic contrast scrim layer so animated graphics never overpower text readability
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .matchParentSize()
                 .background(
                     if (isAnimated) Color.Black.copy(alpha = 0.22f)
                     else Color.Transparent
                 )
         )
 
-        // User's Text Layer (Styled, Centered/Aligned, with soft contrast shadow)
-        Text(
-            text = content,
-            color = styling.textColor,
-            fontSize = styling.fontSizeSp.sp,
-            fontWeight = when (styling.fontStyleName) {
-                "serif" -> FontWeight.SemiBold
-                "display" -> FontWeight.Black
-                else -> FontWeight.ExtraBold
-            },
-            fontFamily = when (styling.fontStyleName) {
-                "serif" -> FontFamily.Serif
-                else -> FontFamily.Default
-            },
-            textAlign = styling.alignment,
-            lineHeight = (styling.fontSizeSp * 1.45f).sp,
-            style = androidx.compose.ui.text.TextStyle(
-                shadow = Shadow(
-                    color = Color.Black.copy(alpha = 0.75f),
-                    offset = Offset(2f, 2f),
-                    blurRadius = 8f
-                )
-            ),
+        // Content box that drives minimum 320dp height while allowing text to expand if long
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 26.dp, vertical = 24.dp)
-        )
+                .defaultMinSize(minHeight = 320.dp)
+                .padding(horizontal = 26.dp, vertical = 24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = content,
+                color = styling.textColor,
+                fontSize = styling.fontSizeSp.sp,
+                fontWeight = when (styling.fontStyleName) {
+                    "serif" -> FontWeight.SemiBold
+                    "display" -> FontWeight.Black
+                    else -> FontWeight.ExtraBold
+                },
+                fontFamily = when (styling.fontStyleName) {
+                    "serif" -> FontFamily.Serif
+                    else -> FontFamily.Default
+                },
+                textAlign = styling.alignment,
+                lineHeight = (styling.fontSizeSp * 1.45f).sp,
+                style = androidx.compose.ui.text.TextStyle(
+                    shadow = Shadow(
+                        color = Color.Black.copy(alpha = 0.75f),
+                        offset = Offset(2f, 2f),
+                        blurRadius = 8f
+                    )
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }

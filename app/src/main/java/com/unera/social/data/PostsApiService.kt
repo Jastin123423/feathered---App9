@@ -312,35 +312,47 @@ object PostsApiService {
 
     fun parseFeedItemToPostExternal(obj: JSONObject): Post? = parseFeedItemToPost(obj)
 
-    internal fun parseFeedItemToPost(obj: JSONObject): Post? {
+    internal fun parseFeedItemToPost(rawObj: JSONObject): Post? {
+        if (rawObj.optInt("is_deleted", 0) == 1) return null
+
+        val dataObj = rawObj.optJSONObject("data") ?: rawObj.optJSONObject("post")
+        val obj = dataObj ?: rawObj
         if (obj.optInt("is_deleted", 0) == 1) return null
 
-        val id = obj.optLong("id", obj.optLong("post_id", System.currentTimeMillis()))
-        val userId = obj.optLong("user_id", obj.optLong("owner_id", 1L))
+        val id = obj.optLong("id", rawObj.optLong("id", obj.optLong("post_id", rawObj.optLong("post_id", System.currentTimeMillis()))))
+        val userId = obj.optLong("user_id", rawObj.optLong("user_id", obj.optLong("owner_id", rawObj.optLong("owner_id", 1L))))
         val authorObj = obj.optJSONObject("author") ?: obj.optJSONObject("user")
+            ?: rawObj.optJSONObject("author") ?: rawObj.optJSONObject("user")
 
         val authorName = authorObj?.optString("name")?.takeIf { it.isNotBlank() && it != "null" }
             ?: authorObj?.optString("display_name")?.takeIf { it.isNotBlank() && it != "null" }
             ?: authorObj?.optString("username")?.takeIf { it.isNotBlank() && it != "null" }
             ?: obj.optString("author_name").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("author_name").takeIf { it.isNotBlank() && it != "null" }
             ?: obj.optString("name").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("name").takeIf { it.isNotBlank() && it != "null" }
             ?: obj.optString("display_name").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("display_name").takeIf { it.isNotBlank() && it != "null" }
             ?: obj.optString("username").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("username").takeIf { it.isNotBlank() && it != "null" }
             ?: ""
 
         val username = authorObj?.optString("username")?.takeIf { it.isNotBlank() && it != "null" }
             ?: obj.optString("username").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("username").takeIf { it.isNotBlank() && it != "null" }
             ?: if (authorName.isNotBlank() && !authorName.startsWith("User")) "@${authorName.lowercase().replace(" ", "")}" else ""
 
         val avatar = authorObj?.optString("profile_image_url")?.takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
             ?: authorObj?.optString("avatar_url")?.takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
             ?: obj.optString("profile_image_url").takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
+            ?: rawObj.optString("profile_image_url").takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
             ?: obj.optString("avatar_url").takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
+            ?: rawObj.optString("avatar_url").takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
             ?: ""
 
         val isVerified = authorObj?.optBoolean("is_verified", false)
-            ?: obj.optBoolean("is_verified", obj.optBoolean("verified", false))
-        val role = authorObj?.optString("role") ?: obj.optString("role", "user")
+            ?: obj.optBoolean("is_verified", rawObj.optBoolean("is_verified", obj.optBoolean("verified", rawObj.optBoolean("verified", false))))
+        val role = authorObj?.optString("role") ?: obj.optString("role", rawObj.optString("role", "user"))
 
         val author = User(
             id = userId,
@@ -352,26 +364,46 @@ object PostsApiService {
         )
 
         val rawContent = obj.optString("content").takeIf { it.isNotBlank() && it != "null" && it != "undefined" }
+            ?: rawObj.optString("content").takeIf { it.isNotBlank() && it != "null" && it != "undefined" }
             ?: obj.optString("description").takeIf { it.isNotBlank() && it != "null" && it != "undefined" }
+            ?: rawObj.optString("description").takeIf { it.isNotBlank() && it != "null" && it != "undefined" }
             ?: ""
         val content = rawContent.trim().let { if (it.equals("null", ignoreCase = true) || it.equals("undefined", ignoreCase = true)) "" else it }
 
-        val mediaUrls = extractMediaUrls(obj)
-        val mediaTypes = extractMediaTypes(obj)
-        val mediaMeta = extractMediaMeta(obj)
+        val mediaUrls = extractMediaUrls(obj).ifEmpty { extractMediaUrls(rawObj) }
+        val mediaTypes = extractMediaTypes(obj).ifEmpty { extractMediaTypes(rawObj) }
+        val mediaMeta = extractMediaMeta(obj).ifEmpty { extractMediaMeta(rawObj) }
         val mediaUrl = obj.optString("media_url").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("media_url").takeIf { it.isNotBlank() && it != "null" }
             ?: mediaUrls.firstOrNull()
 
-        val backgroundStyle = obj.optString("colours").takeIf { it.isNotBlank() && it != "null" }
+        val metaObj = obj.optJSONObject("meta") ?: rawObj.optJSONObject("meta")
+        val rawBackgroundStyle = obj.optString("colours").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("colours").takeIf { it.isNotBlank() && it != "null" }
             ?: obj.optString("background_style").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("background_style").takeIf { it.isNotBlank() && it != "null" }
             ?: obj.optString("background").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("background").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("background_color").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("background_color").takeIf { it.isNotBlank() && it != "null" }
+            ?: metaObj?.optString("colours")?.takeIf { it.isNotBlank() && it != "null" }
+            ?: metaObj?.optString("background_style")?.takeIf { it.isNotBlank() && it != "null" }
+            ?: metaObj?.optString("background")?.takeIf { it.isNotBlank() && it != "null" }
+
+        val backgroundStyle = rawBackgroundStyle?.trim()?.removeSurrounding("\"")?.replace("\\\"", "\"")?.takeIf {
+            it.isNotBlank() && it != "null" && it != "undefined" && !it.equals("none", ignoreCase = true)
+        }
 
         val groupId = if (obj.has("group_id") && !obj.isNull("group_id") && obj.optLong("group_id") > 0) {
             obj.optLong("group_id")
+        } else if (rawObj.has("group_id") && !rawObj.isNull("group_id") && rawObj.optLong("group_id") > 0) {
+            rawObj.optLong("group_id")
         } else null
 
         val groupName = obj.optString("group_name").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("group_name").takeIf { it.isNotBlank() && it != "null" }
         val groupImage = obj.optString("group_image").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("group_image").takeIf { it.isNotBlank() && it != "null" }
 
         val rawDate = obj.optString("created_at").takeIf { it.isNotBlank() && it != "null" }
         val timestamp = formatTimestamp(rawDate)
@@ -385,7 +417,6 @@ object PostsApiService {
         val postTypeRaw = obj.optString("post_type").takeIf { it.isNotBlank() && it != "null" } ?: ""
         val feedKey = obj.optString("feed_key", "")
 
-        val metaObj = obj.optJSONObject("meta")
         val metaKind = metaObj?.optString("kind", "")?.takeIf { it.isNotBlank() }
             ?: metaObj?.optString("type", "")?.takeIf { it.isNotBlank() }
             ?: ""
@@ -766,34 +797,46 @@ object PostsApiService {
         )
     }
 
-    private fun parsePostJson(obj: JSONObject): Post? {
+    private fun parsePostJson(rawObj: JSONObject): Post? {
+        if (rawObj.optInt("is_deleted", 0) == 1) return null
+
+        val dataObj = rawObj.optJSONObject("data") ?: rawObj.optJSONObject("post")
+        val obj = dataObj ?: rawObj
         if (obj.optInt("is_deleted", 0) == 1) return null
 
-        val id = obj.optLong("id", System.currentTimeMillis())
-        val userId = obj.optLong("user_id", obj.optLong("owner_id", 0L))
+        val id = obj.optLong("id", rawObj.optLong("id", System.currentTimeMillis()))
+        val userId = obj.optLong("user_id", rawObj.optLong("user_id", obj.optLong("owner_id", rawObj.optLong("owner_id", 0L))))
         val authorObj = obj.optJSONObject("author") ?: obj.optJSONObject("user")
+            ?: rawObj.optJSONObject("author") ?: rawObj.optJSONObject("user")
 
         val authorName = authorObj?.optString("name")?.takeIf { it.isNotBlank() && it != "null" }
             ?: authorObj?.optString("display_name")?.takeIf { it.isNotBlank() && it != "null" }
             ?: authorObj?.optString("username")?.takeIf { it.isNotBlank() && it != "null" }
             ?: obj.optString("author_name").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("author_name").takeIf { it.isNotBlank() && it != "null" }
             ?: obj.optString("name").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("name").takeIf { it.isNotBlank() && it != "null" }
             ?: obj.optString("display_name").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("display_name").takeIf { it.isNotBlank() && it != "null" }
             ?: obj.optString("username").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("username").takeIf { it.isNotBlank() && it != "null" }
             ?: ""
         val username = authorObj?.optString("username")?.takeIf { it.isNotBlank() && it != "null" }
             ?: obj.optString("username").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("username").takeIf { it.isNotBlank() && it != "null" }
             ?: if (authorName.isNotBlank() && !authorName.startsWith("User")) "@${authorName.lowercase().replace(" ", "")}" else ""
         val avatar = authorObj?.optString("profile_image_url")?.takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
             ?: authorObj?.optString("avatar_url")?.takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
             ?: obj.optString("author_avatar").takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
             ?: obj.optString("profile_image_url").takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
+            ?: rawObj.optString("profile_image_url").takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
             ?: obj.optString("avatar_url").takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
+            ?: rawObj.optString("avatar_url").takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
             ?: ""
 
         val isVerified = authorObj?.optBoolean("is_verified", false)
-            ?: obj.optBoolean("is_verified", false)
-        val role = authorObj?.optString("role") ?: obj.optString("role", "user")
+            ?: obj.optBoolean("is_verified", rawObj.optBoolean("is_verified", false))
+        val role = authorObj?.optString("role") ?: obj.optString("role", rawObj.optString("role", "user"))
 
         val author = User(
             id = userId,
@@ -804,22 +847,45 @@ object PostsApiService {
             role = role
         )
 
-        val content = obj.optString("content").takeIf { it != "null" } ?: ""
-        val mediaUrls = extractMediaUrls(obj)
-        val mediaTypes = extractMediaTypes(obj)
-        val mediaMeta = extractMediaMeta(obj)
+        val rawContent = obj.optString("content").takeIf { it.isNotBlank() && it != "null" && it != "undefined" }
+            ?: rawObj.optString("content").takeIf { it.isNotBlank() && it != "null" && it != "undefined" }
+            ?: obj.optString("description").takeIf { it.isNotBlank() && it != "null" && it != "undefined" }
+            ?: rawObj.optString("description").takeIf { it.isNotBlank() && it != "null" && it != "undefined" }
+            ?: ""
+        val content = rawContent.trim().let { if (it.equals("null", ignoreCase = true) || it.equals("undefined", ignoreCase = true)) "" else it }
+
+        val mediaUrls = extractMediaUrls(obj).ifEmpty { extractMediaUrls(rawObj) }
+        val mediaTypes = extractMediaTypes(obj).ifEmpty { extractMediaTypes(rawObj) }
+        val mediaMeta = extractMediaMeta(obj).ifEmpty { extractMediaMeta(rawObj) }
         val mediaUrl = obj.optString("media_url").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("media_url").takeIf { it.isNotBlank() && it != "null" }
             ?: mediaUrls.firstOrNull()
 
-        val backgroundStyle = obj.optString("colours").takeIf { it.isNotBlank() && it != "null" }
+        val metaObj = obj.optJSONObject("meta") ?: rawObj.optJSONObject("meta")
+        val rawBackgroundStyle = obj.optString("colours").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("colours").takeIf { it.isNotBlank() && it != "null" }
             ?: obj.optString("background_style").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("background_style").takeIf { it.isNotBlank() && it != "null" }
             ?: obj.optString("background").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("background").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("background_color").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("background_color").takeIf { it.isNotBlank() && it != "null" }
+            ?: metaObj?.optString("colours")?.takeIf { it.isNotBlank() && it != "null" }
+            ?: metaObj?.optString("background_style")?.takeIf { it.isNotBlank() && it != "null" }
+            ?: metaObj?.optString("background")?.takeIf { it.isNotBlank() && it != "null" }
+
+        val backgroundStyle = rawBackgroundStyle?.trim()?.removeSurrounding("\"")?.replace("\\\"", "\"")?.takeIf {
+            it.isNotBlank() && it != "null" && it != "undefined" && !it.equals("none", ignoreCase = true)
+        }
 
         val groupId = if (obj.has("group_id") && !obj.isNull("group_id") && obj.optLong("group_id") > 0) {
             obj.optLong("group_id")
+        } else if (rawObj.has("group_id") && !rawObj.isNull("group_id") && rawObj.optLong("group_id") > 0) {
+            rawObj.optLong("group_id")
         } else null
 
         val rawDate = obj.optString("created_at").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("created_at").takeIf { it.isNotBlank() && it != "null" }
         val timestamp = formatTimestamp(rawDate)
 
         val sharesCount = obj.optInt("shares", obj.optInt("shares_count", 0))

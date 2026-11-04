@@ -399,8 +399,20 @@ val ALL_TEXT_POST_BACKGROUNDS: List<TextPostBackgroundTemplate> = listOf(
  */
 fun findBackgroundTemplate(styleOrId: String?): TextPostBackgroundTemplate? {
     if (styleOrId.isNullOrBlank()) return null
-    val cleanId = styleOrId.substringBefore("|").trim()
-    return ALL_TEXT_POST_BACKGROUNDS.find { it.id.equals(cleanId, ignoreCase = true) || it.styleString.equals(cleanId, ignoreCase = true) }
+    val stripped = styleOrId.trim().removeSurrounding("\"").replace("\\\"", "\"")
+    val firstPart = stripped.substringBefore("|").trim()
+    val idWithPrefix = if (firstPart.startsWith("animated:")) firstPart else "animated:$firstPart"
+    val idWithoutPrefix = firstPart.removePrefix("animated:").trim()
+
+    return ALL_TEXT_POST_BACKGROUNDS.find {
+        it.id.equals(firstPart, ignoreCase = true) ||
+        it.id.equals(idWithPrefix, ignoreCase = true) ||
+        it.id.equals(idWithoutPrefix, ignoreCase = true) ||
+        it.styleString.equals(firstPart, ignoreCase = true) ||
+        it.styleString.equals(idWithPrefix, ignoreCase = true)
+    } ?: ALL_TEXT_POST_BACKGROUNDS.find {
+        it.isAnimated && firstPart.contains(it.id.removePrefix("animated:"), ignoreCase = true)
+    }
 }
 
 /**
@@ -415,12 +427,13 @@ data class TextPostStyling(
     companion object {
         fun parse(styleString: String?): TextPostStyling {
             if (styleString.isNullOrBlank()) return TextPostStyling()
+            val clean = styleString.trim().removeSurrounding("\"").replace("\\\"", "\"")
             var align = TextAlign.Center
             var color = Color.White
             var size = 23
             var font = "bold"
 
-            val parts = styleString.split("|")
+            val parts = clean.split("|")
             for (p in parts) {
                 val kv = p.trim().split(":")
                 if (kv.size == 2) {

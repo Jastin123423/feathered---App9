@@ -1852,7 +1852,11 @@ fun GroupPostCard(
             val cleanContent = remember(post.content) {
                 post.content.trim().let { if (it.equals("null", ignoreCase = true) || it.equals("undefined", ignoreCase = true)) "" else it }
             }
-            if (!post.backgroundStyle.isNullOrBlank() && cleanContent.isNotBlank() && post.imageUrls.isEmpty() && post.videoUrl.isNullOrBlank()) {
+            val hasBackground = !post.backgroundStyle.isNullOrBlank() &&
+                    !post.backgroundStyle.equals("none", ignoreCase = true) &&
+                    !post.backgroundStyle.equals("null", ignoreCase = true)
+
+            if (hasBackground && cleanContent.isNotBlank() && post.imageUrls.isEmpty() && post.videoUrl.isNullOrBlank()) {
                 TextPostBackgroundView(
                     backgroundStyle = post.backgroundStyle,
                     content = cleanContent,
