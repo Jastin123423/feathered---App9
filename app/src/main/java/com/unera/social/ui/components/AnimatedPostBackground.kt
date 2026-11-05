@@ -135,6 +135,19 @@ fun AnimatedPostBackground(
                 "gentle_rain" -> drawGentleRain(w, h, fastProgress)
                 "sunset_clouds" -> drawSunsetClouds(w, h, animProgress)
 
+                // ==================== REALISTIC ====================
+                "realistic_magical_garden" -> drawRealisticMagicalGarden(w, h, pulseProgress, animProgress)
+                "realistic_3d_panda" -> drawRealistic3dPanda(w, h, fastProgress, pulseProgress)
+                "realistic_rose_garden" -> drawRealisticRoseGarden(w, h, pulseProgress, animProgress)
+                "realistic_fantasy_forest" -> drawRealisticFantasyForest(w, h, pulseProgress, animProgress)
+                "realistic_glowing_mushrooms" -> drawRealisticGlowingMushrooms(w, h, pulseProgress, animProgress)
+                "realistic_magical_waterfall" -> drawRealisticMagicalWaterfall(w, h, fastProgress)
+                "realistic_butterfly_haven" -> drawRealisticButterflyHaven(w, h, animProgress, fastProgress)
+                "realistic_firefly_glade" -> drawRealisticFireflyGlade(w, h, animProgress, pulseProgress)
+                "realistic_floating_petals" -> drawRealisticFloatingPetals(w, h, animProgress)
+                "realistic_luxury_romantic" -> drawRealisticLuxuryRomantic(w, h, animProgress, pulseProgress)
+                "realistic_3d_lion" -> drawRealistic3dLion(w, h, fastProgress, pulseProgress)
+
                 else -> drawCosmicStars(w, h, animProgress, fastProgress)
             }
         }
@@ -1236,6 +1249,1266 @@ private fun DrawScope.drawSunsetClouds(w: Float, h: Float, progress: Float) {
             radius = 24f
         )
     }
+}
+
+// =========================================================================
+// REALISTIC COLLECTION DRAWING IMPLEMENTATIONS
+// =========================================================================
+
+/**
+ * 1. Realistic Magical Garden: Night sky, crescent moon with aura, layered mountains,
+ * curved garden landscape, swaying multi-petaled flowers with stems, glowing stars & fireflies.
+ */
+private fun DrawScope.drawRealisticMagicalGarden(w: Float, h: Float, pulse: Float, progress: Float) {
+    // 1. Sky Gradient
+    drawRect(
+        brush = Brush.linearGradient(
+            colors = listOf(Color(0xFF080D35), Color(0xFF45246F), Color(0xFF087E78)),
+            start = Offset.Zero,
+            end = Offset(w, h)
+        )
+    )
+
+    // 2. Crescent Moon with Outer Aura
+    val moonX = w * 0.78f
+    val moonY = h * 0.2f
+    val moonR = min(w, h) * 0.09f
+
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(
+                Color(0xFFFFFBD1).copy(alpha = 0.75f),
+                Color(0xFFF7DCA0).copy(alpha = 0.35f),
+                Color.Transparent
+            ),
+            center = Offset(moonX, moonY),
+            radius = moonR * 2.2f
+        ),
+        center = Offset(moonX, moonY),
+        radius = moonR * 2.2f
+    )
+
+    drawCircle(
+        color = Color(0xFFFFF2C6),
+        center = Offset(moonX, moonY),
+        radius = moonR
+    )
+
+    drawCircle(
+        color = Color(0xFF45246F),
+        center = Offset(moonX + moonR * 0.4f, moonY - moonR * 0.3f),
+        radius = moonR * 0.9f
+    )
+
+    // 3. Glowing twinkling stars
+    val stars = listOf(
+        Triple(0.12f, 0.18f, 2.8f),
+        Triple(0.26f, 0.12f, 2.2f),
+        Triple(0.44f, 0.22f, 2.6f),
+        Triple(0.60f, 0.10f, 2.3f),
+        Triple(0.88f, 0.32f, 2.5f),
+        Triple(0.20f, 0.38f, 2.2f),
+        Triple(0.38f, 0.44f, 2.7f),
+        Triple(0.68f, 0.40f, 2.1f)
+    )
+
+    for ((idx, s) in stars.withIndex()) {
+        val twinkle = (0.35f + 0.65f * abs(sin((progress * 2 * PI + idx * 1.3).toDouble()).toFloat()))
+        val sx = w * s.first
+        val sy = h * s.second
+        drawCircle(
+            color = Color(0xFFFFF5BC).copy(alpha = 0.3f * twinkle),
+            center = Offset(sx, sy),
+            radius = s.third * 2.4f
+        )
+        drawCircle(
+            color = Color(0xFFFFF5BC).copy(alpha = twinkle),
+            center = Offset(sx, sy),
+            radius = s.third
+        )
+    }
+
+    // 4. Distant Mountains Silhouette
+    val mountainPath = Path().apply {
+        moveTo(0f, h * 0.65f)
+        lineTo(w * 0.16f, h * 0.42f)
+        lineTo(w * 0.34f, h * 0.62f)
+        lineTo(w * 0.54f, h * 0.36f)
+        lineTo(w * 0.80f, h * 0.66f)
+        lineTo(w, h * 0.44f)
+        lineTo(w, h)
+        lineTo(0f, h)
+        close()
+    }
+    drawPath(
+        path = mountainPath,
+        color = Color(0xFF19244C).copy(alpha = 0.82f)
+    )
+
+    // 5. Rolling Garden Landscape
+    val landscapePath = Path().apply {
+        moveTo(0f, h * 0.74f)
+        quadraticTo(w * 0.25f, h * 0.62f, w * 0.50f, h * 0.76f)
+        quadraticTo(w * 0.75f, h * 0.64f, w, h * 0.72f)
+        lineTo(w, h)
+        lineTo(0f, h)
+        close()
+    }
+    drawPath(
+        path = landscapePath,
+        brush = Brush.verticalGradient(
+            colors = listOf(Color(0xFF092F38), Color(0xFF03161C)),
+            startY = h * 0.65f,
+            endY = h
+        )
+    )
+
+    // 6. Swaying Magical Flowers
+    fun drawFlowerGroup(fx: Float, fy: Float, flowerScale: Float, phaseOffset: Float) {
+        val sway = sin((progress * 2 * PI + phaseOffset).toDouble()).toFloat() * 6f
+
+        // Stem
+        val stemPath = Path().apply {
+            moveTo(fx, fy + 70f * flowerScale)
+            quadraticTo(
+                fx + 10f * flowerScale + (sway * 1.5f),
+                fy + 35f * flowerScale,
+                fx + (sway * 2f),
+                fy
+            )
+        }
+        drawPath(
+            path = stemPath,
+            color = Color(0xFF53BD87),
+            style = Stroke(width = 5f * flowerScale, cap = StrokeCap.Round)
+        )
+
+        // Flower Blossom (5 petals)
+        val flowerCenter = Offset(fx + (sway * 2f), fy)
+        val petalR = 18f * flowerScale
+        for (i in 0 until 5) {
+            val angle = i * 72f + sway
+            val rad = Math.toRadians(angle.toDouble())
+            val px = flowerCenter.x + (cos(rad) * petalR * 0.9f).toFloat()
+            val py = flowerCenter.y + (sin(rad) * petalR * 0.9f).toFloat()
+
+            drawOval(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFFFFB3D9), Color(0xFFE98BC5), Color(0xFFBE185D)),
+                    center = Offset(px, py),
+                    radius = petalR * 1.2f
+                ),
+                topLeft = Offset(px - petalR * 0.6f, py - petalR * 0.9f),
+                size = Size(petalR * 1.2f, petalR * 1.8f)
+            )
+        }
+
+        // Flower golden core with glow
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(Color(0xFFFFF0A0), Color(0xFFFFE69B), Color(0xFFF59E0B)),
+                center = flowerCenter,
+                radius = 12f * flowerScale
+            ),
+            center = flowerCenter,
+            radius = 10f * flowerScale
+        )
+    }
+
+    drawFlowerGroup(w * 0.24f, h * 0.76f, 1.0f, 0f)
+    drawFlowerGroup(w * 0.70f, h * 0.74f, 1.35f, 2f)
+
+    // 7. Fireflies with soft glowing aura
+    val fireflyCount = 7
+    for (i in 0 until fireflyCount) {
+        val t = (progress + i * 0.16f) % 1f
+        val fx = (w * (0.12f + i * 0.13f) + sin((progress * 4 * PI + i).toDouble()).toFloat() * 18f)
+        val fy = h * (0.85f - t * 0.55f)
+        val pulseFly = 0.4f + 0.6f * sin((progress * 6 * PI + i * 1.8f).toDouble()).toFloat()
+
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color(0xFFBAFF9C).copy(alpha = 0.85f * pulseFly),
+                    Color(0xFFBAFF9C).copy(alpha = 0.25f * pulseFly),
+                    Color.Transparent
+                ),
+                center = Offset(fx, fy),
+                radius = 16f
+            ),
+            center = Offset(fx, fy),
+            radius = 16f
+        )
+        drawCircle(
+            color = Color(0xFFFFFBEB).copy(alpha = pulseFly),
+            center = Offset(fx, fy),
+            radius = 3.5f
+        )
+    }
+}
+
+/**
+ * 2. Premium 3D Panda: Shaded 3D body volume with spherical radial lighting,
+ * dynamic grounded dancing bounce, velvety black limbs, expressive face, specular highlights.
+ */
+private fun DrawScope.drawRealistic3dPanda(w: Float, h: Float, fastProgress: Float, pulse: Float) {
+    // 1. Bamboo Forest Atmosphere Background
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(Color(0xFF064E3B), Color(0xFF022C22), Color(0xFF042F2E))
+        )
+    )
+
+    // Silhouette bamboo stalks in background
+    for (i in 0..5) {
+        val bx = w * (0.08f + i * 0.18f)
+        drawLine(
+            color = Color(0xFF065F46).copy(alpha = 0.35f),
+            start = Offset(bx, 0f),
+            end = Offset(bx, h),
+            strokeWidth = 12f
+        )
+        for (j in 1..4) {
+            drawLine(
+                color = Color(0xFF047857).copy(alpha = 0.45f),
+                start = Offset(bx - 8f, h * (j * 0.22f)),
+                end = Offset(bx + 8f, h * (j * 0.22f)),
+                strokeWidth = 3f
+            )
+        }
+    }
+
+    // 2. Physics & Dance Calculations
+    val bounceY = -abs(sin(fastProgress * PI).toFloat()) * (h * 0.038f)
+    val cx = w * 0.5f
+    val cy = h * 0.56f + bounceY
+    val scale = min(w, h) * 0.0026f
+
+    // 3. Ground Soft Shadow
+    val shadowWidth = (170f * scale) * (1f - abs(bounceY) / (h * 0.08f))
+    drawOval(
+        brush = Brush.radialGradient(
+            colors = listOf(Color(0xFF001B24).copy(alpha = 0.55f), Color.Transparent),
+            center = Offset(cx, h * 0.86f),
+            radius = shadowWidth * 0.55f
+        ),
+        topLeft = Offset(cx - shadowWidth * 0.5f, h * 0.86f - 16f * scale),
+        size = Size(shadowWidth, 32f * scale)
+    )
+
+    // Shading Brushes
+    val pandaBodyBrush = Brush.radialGradient(
+        colors = listOf(Color(0xFFFFFFFF), Color(0xFFE7EDF2), Color(0xFFAAB5C2)),
+        center = Offset(cx - 30f * scale, cy - 40f * scale),
+        radius = 140f * scale
+    )
+
+    val pandaBlackBrush = Brush.radialGradient(
+        colors = listOf(Color(0xFF48546B), Color(0xFF1E293B), Color(0xFF090F21)),
+        center = Offset(cx - 20f * scale, cy - 20f * scale),
+        radius = 90f * scale
+    )
+
+    // 4. Ears
+    val earR = 36f * scale
+    drawCircle(brush = pandaBlackBrush, center = Offset(cx - 62f * scale, cy - 128f * scale), radius = earR)
+    drawCircle(brush = pandaBlackBrush, center = Offset(cx + 62f * scale, cy - 128f * scale), radius = earR)
+
+    drawOval(
+        color = Color.White.copy(alpha = 0.35f),
+        topLeft = Offset(cx - 62f * scale - 12f * scale, cy - 128f * scale - 6f * scale),
+        size = Size(24f * scale, 12f * scale)
+    )
+    drawOval(
+        color = Color.White.copy(alpha = 0.35f),
+        topLeft = Offset(cx + 62f * scale - 12f * scale, cy - 128f * scale - 6f * scale),
+        size = Size(24f * scale, 12f * scale)
+    )
+
+    // 5. Body
+    drawOval(
+        brush = pandaBodyBrush,
+        topLeft = Offset(cx - 68f * scale, cy - 22f * scale),
+        size = Size(136f * scale, 168f * scale)
+    )
+
+    // Belly White Highlight
+    drawOval(
+        color = Color.White.copy(alpha = 0.65f),
+        topLeft = Offset(cx - 44f * scale, cy - 4f * scale),
+        size = Size(88f * scale, 110f * scale)
+    )
+
+    // 6. Arms (Dancing)
+    val armAngleL = 25f + sin(fastProgress * 2 * PI).toFloat() * 18f
+    val armAngleR = -25f - sin(fastProgress * 2 * PI).toFloat() * 18f
+
+    rotate(armAngleL, pivot = Offset(cx - 78f * scale, cy + 20f * scale)) {
+        drawOval(
+            brush = pandaBlackBrush,
+            topLeft = Offset(cx - 96f * scale, cy - 10f * scale),
+            size = Size(46f * scale, 105f * scale)
+        )
+    }
+
+    rotate(armAngleR, pivot = Offset(cx + 78f * scale, cy + 20f * scale)) {
+        drawOval(
+            brush = pandaBlackBrush,
+            topLeft = Offset(cx + 50f * scale, cy - 10f * scale),
+            size = Size(46f * scale, 105f * scale)
+        )
+    }
+
+    // 7. Legs
+    drawOval(
+        brush = pandaBlackBrush,
+        topLeft = Offset(cx - 68f * scale, cy + 115f * scale),
+        size = Size(58f * scale, 36f * scale)
+    )
+    drawOval(
+        brush = pandaBlackBrush,
+        topLeft = Offset(cx + 10f * scale, cy + 115f * scale),
+        size = Size(58f * scale, 36f * scale)
+    )
+
+    // 8. 3D Head
+    val headR = 78f * scale
+    val headCenter = Offset(cx, cy - 70f * scale)
+    drawCircle(
+        brush = pandaBodyBrush,
+        center = headCenter,
+        radius = headR
+    )
+
+    // 9. Eye Patches
+    rotate(25f, pivot = Offset(cx - 32f * scale, cy - 76f * scale)) {
+        drawOval(
+            brush = pandaBlackBrush,
+            topLeft = Offset(cx - 48f * scale, cy - 98f * scale),
+            size = Size(36f * scale, 50f * scale)
+        )
+    }
+    rotate(-25f, pivot = Offset(cx + 32f * scale, cy - 76f * scale)) {
+        drawOval(
+            brush = pandaBlackBrush,
+            topLeft = Offset(cx + 12f * scale, cy - 98f * scale),
+            size = Size(36f * scale, 50f * scale)
+        )
+    }
+
+    val eyeYL = cy - 76f * scale
+    val eyeYR = cy - 76f * scale
+    drawCircle(color = Color.White, center = Offset(cx - 28f * scale, eyeYL), radius = 10f * scale)
+    drawCircle(color = Color.White, center = Offset(cx + 28f * scale, eyeYR), radius = 10f * scale)
+
+    drawCircle(color = Color(0xFF111827), center = Offset(cx - 27f * scale, eyeYL + 1f * scale), radius = 5.5f * scale)
+    drawCircle(color = Color(0xFF111827), center = Offset(cx + 27f * scale, eyeYR + 1f * scale), radius = 5.5f * scale)
+
+    // Specular catchlights
+    drawCircle(color = Color.White, center = Offset(cx - 29f * scale, eyeYL - 2f * scale), radius = 2.2f * scale)
+    drawCircle(color = Color.White, center = Offset(cx + 25f * scale, eyeYR - 2f * scale), radius = 2.2f * scale)
+
+    // 10. Cute Snout & Nose
+    drawOval(
+        color = Color.White,
+        topLeft = Offset(cx - 30f * scale, cy - 54f * scale),
+        size = Size(60f * scale, 42f * scale)
+    )
+
+    drawOval(
+        color = Color(0xFF101827),
+        topLeft = Offset(cx - 11f * scale, cy - 50f * scale),
+        size = Size(22f * scale, 15f * scale)
+    )
+    drawCircle(color = Color.White.copy(alpha = 0.8f), center = Offset(cx - 4f * scale, cy - 47f * scale), radius = 2.5f * scale)
+
+    // Mouth
+    val mouthPath = Path().apply {
+        moveTo(cx, cy - 35f * scale)
+        quadraticTo(cx - 10f * scale, cy - 23f * scale, cx - 18f * scale, cy - 28f * scale)
+        moveTo(cx, cy - 35f * scale)
+        quadraticTo(cx + 10f * scale, cy - 23f * scale, cx + 18f * scale, cy - 28f * scale)
+    }
+    drawPath(
+        path = mouthPath,
+        color = Color(0xFF252D39),
+        style = Stroke(width = 3.2f * scale, cap = StrokeCap.Round)
+    )
+
+    // 11. Rosy Blushing Cheeks
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(Color(0xFFFF9BA9).copy(alpha = 0.75f), Color.Transparent),
+            center = Offset(cx - 52f * scale, cy - 54f * scale),
+            radius = 24f * scale
+        ),
+        center = Offset(cx - 52f * scale, cy - 54f * scale),
+        radius = 24f * scale
+    )
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(Color(0xFFFF9BA9).copy(alpha = 0.75f), Color.Transparent),
+            center = Offset(cx + 52f * scale, cy - 54f * scale),
+            radius = 24f * scale
+        ),
+        center = Offset(cx + 52f * scale, cy - 54f * scale),
+        radius = 24f * scale
+    )
+}
+
+/**
+ * 3. Blooming Rose Garden: Luxurious layered velvet petals, deep shadows,
+ * drifting floating silky rose petals with realistic tumbling flutter, glowing ambient motes.
+ */
+private fun DrawScope.drawRealisticRoseGarden(w: Float, h: Float, pulse: Float, progress: Float) {
+    // Velvet background
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(Color(0xFF2A0614), Color(0xFF4C0519), Color(0xFF881337))
+        )
+    )
+
+    // Ambient background floral glow
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(Color(0xFFBE123C).copy(alpha = 0.28f), Color.Transparent),
+            center = Offset(w * 0.5f, h * 0.65f),
+            radius = w * 0.55f
+        ),
+        center = Offset(w * 0.5f, h * 0.65f),
+        radius = w * 0.55f
+    )
+
+    // Layered rose blooms on bottom corners
+    fun drawCornerRose(rx: Float, ry: Float, baseRadius: Float) {
+        val petalCount = 8
+        for (layer in 0..4) {
+            val r = baseRadius * (1f - layer * 0.18f)
+            val rot = layer * 35f + pulse * 8f
+            for (i in 0 until petalCount) {
+                val ang = Math.toRadians((i * (360f / petalCount) + rot).toDouble())
+                val px = rx + (cos(ang) * r * 0.5f).toFloat()
+                val py = ry + (sin(ang) * r * 0.5f).toFloat()
+                val color = when (layer) {
+                    0 -> Color(0xFF4C0519)
+                    1 -> Color(0xFF881337)
+                    2 -> Color(0xFFBE123C)
+                    3 -> Color(0xFFE11D48)
+                    else -> Color(0xFFFDA4AF)
+                }
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(color, color.copy(alpha = 0.6f)),
+                        center = Offset(px, py),
+                        radius = r * 0.5f
+                    ),
+                    center = Offset(px, py),
+                    radius = r * 0.45f
+                )
+            }
+        }
+    }
+
+    drawCornerRose(w * 0.12f, h * 0.88f, min(w, h) * 0.25f)
+    drawCornerRose(w * 0.88f, h * 0.86f, min(w, h) * 0.28f)
+
+    // 12 Floating and tumbling silky rose petals
+    val petals = listOf(
+        Pair(0.15f, 0.20f), Pair(0.35f, 0.45f), Pair(0.55f, 0.15f),
+        Pair(0.75f, 0.60f), Pair(0.85f, 0.30f), Pair(0.25f, 0.75f),
+        Pair(0.48f, 0.85f), Pair(0.65f, 0.40f), Pair(0.08f, 0.55f),
+        Pair(0.92f, 0.10f), Pair(0.40f, 0.10f), Pair(0.80f, 0.80f)
+    )
+
+    for ((idx, p) in petals.withIndex()) {
+        val speed = 0.6f + (idx % 4) * 0.15f
+        val t = (progress * speed + idx * 0.08f) % 1f
+        val px = (w * p.first + sin((progress * 4 * PI + idx).toDouble()).toFloat() * 25f)
+        val py = (h * (p.second + t) % (h + 60f)) - 30f
+        val flutter = cos((progress * 5 * PI + idx * 2).toDouble()).toFloat()
+        val petalScale = 0.7f + (idx % 3) * 0.25f
+
+        rotate(flutter * 45f + idx * 30f, pivot = Offset(px, py)) {
+            drawOval(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFFFB7185), Color(0xFFE11D48), Color(0xFF881337)),
+                    center = Offset(px, py),
+                    radius = 20f * petalScale
+                ),
+                topLeft = Offset(px - 14f * petalScale * abs(flutter).coerceAtLeast(0.3f), py - 22f * petalScale),
+                size = Size(28f * petalScale * abs(flutter).coerceAtLeast(0.3f), 44f * petalScale)
+            )
+        }
+    }
+
+    // Golden ambient pollen motes
+    for (i in 0..10) {
+        val mx = (w * (0.1f + i * 0.085f) + sin((progress * 2 * PI + i).toDouble()).toFloat() * 12f)
+        val my = (h * (0.2f + (i * 0.17f + progress * 0.2f) % 0.8f))
+        drawCircle(
+            color = Color(0xFFFDE047).copy(alpha = 0.45f + 0.35f * sin((progress * 4 * PI + i).toDouble()).toFloat()),
+            center = Offset(mx, my),
+            radius = 2.5f
+        )
+    }
+}
+
+/**
+ * 4. Sunlit Enchanted Forest: Majestic forest canopy, diagonal volumetric light rays,
+ * sun shimmer, rising golden spores and dandelion seeds.
+ */
+private fun DrawScope.drawRealisticFantasyForest(w: Float, h: Float, pulse: Float, progress: Float) {
+    // Deep woodland background
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(Color(0xFF052E16), Color(0xFF14532D), Color(0xFF166534))
+        )
+    )
+
+    // Tree silhouettes on flanks
+    drawRect(
+        brush = Brush.horizontalGradient(
+            colors = listOf(Color(0xFF022C22).copy(alpha = 0.85f), Color.Transparent),
+            startX = 0f,
+            endX = w * 0.22f
+        ),
+        topLeft = Offset.Zero,
+        size = Size(w * 0.22f, h)
+    )
+    drawRect(
+        brush = Brush.horizontalGradient(
+            colors = listOf(Color.Transparent, Color(0xFF022C22).copy(alpha = 0.85f)),
+            startX = w * 0.78f,
+            endX = w
+        ),
+        topLeft = Offset(w * 0.78f, 0f),
+        size = Size(w * 0.22f, h)
+    )
+
+    // Overhead foliage canopy
+    val canopyPath = Path().apply {
+        moveTo(0f, 0f)
+        lineTo(w, 0f)
+        lineTo(w, h * 0.15f)
+        quadraticTo(w * 0.75f, h * 0.28f, w * 0.5f, h * 0.12f)
+        quadraticTo(w * 0.25f, h * 0.25f, 0f, h * 0.14f)
+        close()
+    }
+    drawPath(path = canopyPath, color = Color(0xFF022C22).copy(alpha = 0.9f))
+
+    // 4 Volumetric Diagonal Sunbeams (God Rays)
+    for (i in 0..3) {
+        val rayX = w * (0.15f + i * 0.22f)
+        val beamAlpha = 0.18f + 0.08f * sin((progress * 2 * PI + i * 1.5).toDouble()).toFloat()
+        val rayPath = Path().apply {
+            moveTo(rayX - 30f, 0f)
+            lineTo(rayX + 45f, 0f)
+            lineTo(rayX + 180f, h)
+            lineTo(rayX + 80f, h)
+            close()
+        }
+        drawPath(
+            path = rayPath,
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFFFEF08A).copy(alpha = beamAlpha),
+                    Color(0xFF86EFAC).copy(alpha = beamAlpha * 0.4f),
+                    Color.Transparent
+                ),
+                start = Offset(rayX, 0f),
+                end = Offset(rayX + 130f, h)
+            )
+        )
+    }
+
+    // Rising golden spores & dandelion seeds
+    for (i in 0..14) {
+        val t = (progress * 0.6f + i * 0.07f) % 1f
+        val sx = (w * (0.1f + i * 0.06f) + sin((progress * 3 * PI + i * 2).toDouble()).toFloat() * 20f)
+        val sy = h * (1f - t)
+        val sporeAlpha = 0.4f + 0.5f * sin((progress * 4 * PI + i).toDouble()).toFloat()
+
+        drawCircle(
+            color = Color(0xFFFEF08A).copy(alpha = sporeAlpha * 0.3f),
+            center = Offset(sx, sy),
+            radius = 6f
+        )
+        drawCircle(
+            color = Color(0xFFFFFBEB).copy(alpha = sporeAlpha),
+            center = Offset(sx, sy),
+            radius = 2f
+        )
+    }
+}
+
+/**
+ * 5. Bioluminescent Glow Mushrooms: Deep enchanted twilight,
+ * multi-cluster glowing mushroom caps with luminous gills, rising magical spores.
+ */
+private fun DrawScope.drawRealisticGlowingMushrooms(w: Float, h: Float, pulse: Float, progress: Float) {
+    // Twilight backdrop
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(Color(0xFF042F2E), Color(0xFF134E4A), Color(0xFF0E7490))
+        )
+    )
+
+    // Mossy ground silhouette
+    val groundPath = Path().apply {
+        moveTo(0f, h * 0.82f)
+        quadraticTo(w * 0.25f, h * 0.76f, w * 0.5f, h * 0.84f)
+        quadraticTo(w * 0.75f, h * 0.74f, w, h * 0.80f)
+        lineTo(w, h)
+        lineTo(0f, h)
+        close()
+    }
+    drawPath(path = groundPath, color = Color(0xFF021B1A))
+
+    // 3 Mushroom Clusters
+    fun drawMushroom(mx: Float, my: Float, mScale: Float, capColor: Color, glowColor: Color) {
+        val pulseGlow = 0.85f + 0.15f * pulse
+
+        // Stem
+        val stemPath = Path().apply {
+            moveTo(mx - 8f * mScale, my + 60f * mScale)
+            quadraticTo(mx - 4f * mScale, my + 30f * mScale, mx - 6f * mScale, my + 5f * mScale)
+            lineTo(mx + 6f * mScale, my + 5f * mScale)
+            quadraticTo(mx + 4f * mScale, my + 30f * mScale, mx + 8f * mScale, my + 60f * mScale)
+            close()
+        }
+        drawPath(
+            path = stemPath,
+            brush = Brush.verticalGradient(
+                colors = listOf(glowColor.copy(alpha = 0.75f), Color(0xFF0F766E).copy(alpha = 0.4f)),
+                startY = my,
+                endY = my + 60f * mScale
+            )
+        )
+
+        // Cap Outer Aura Glow
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(glowColor.copy(alpha = 0.45f * pulseGlow), Color.Transparent),
+                center = Offset(mx, my),
+                radius = 70f * mScale * pulseGlow
+            ),
+            center = Offset(mx, my),
+            radius = 70f * mScale * pulseGlow
+        )
+
+        // Cap (Semi-oval dome)
+        val capR = 48f * mScale
+        drawOval(
+            brush = Brush.radialGradient(
+                colors = listOf(Color.White, capColor, glowColor, Color(0xFF042F2E)),
+                center = Offset(mx, my - 8f * mScale),
+                radius = capR * 1.1f
+            ),
+            topLeft = Offset(mx - capR, my - capR * 0.65f),
+            size = Size(capR * 2f, capR * 1.3f)
+        )
+
+        // Radiating Gills Under Cap
+        for (g in -4..4) {
+            val gx = mx + g * (capR * 0.18f)
+            drawLine(
+                color = glowColor.copy(alpha = 0.75f),
+                start = Offset(gx, my + capR * 0.45f),
+                end = Offset(mx, my + 10f * mScale),
+                strokeWidth = 1.8f
+            )
+        }
+    }
+
+    drawMushroom(w * 0.22f, h * 0.76f, 1.15f, Color(0xFF2DD4BF), Color(0xFF14B8A6))
+    drawMushroom(w * 0.35f, h * 0.79f, 0.75f, Color(0xFFA855F7), Color(0xFFC084FC))
+    drawMushroom(w * 0.76f, h * 0.75f, 1.25f, Color(0xFF38BDF8), Color(0xFF0EA5E9))
+
+    // Rising glowing spores
+    for (i in 0..12) {
+        val t = (progress + i * 0.08f) % 1f
+        val sx = (w * (0.15f + i * 0.06f) + sin((progress * 3 * PI + i).toDouble()).toFloat() * 15f)
+        val sy = h * (0.85f - t * 0.65f)
+        val sporeAlpha = (sin(t * PI).toFloat()).coerceIn(0f, 1f)
+
+        drawCircle(
+            color = Color(0xFF2DD4BF).copy(alpha = sporeAlpha * 0.35f),
+            center = Offset(sx, sy),
+            radius = 8f
+        )
+        drawCircle(
+            color = Color(0xFFCCFBF1).copy(alpha = sporeAlpha),
+            center = Offset(sx, sy),
+            radius = 2.5f
+        )
+    }
+}
+
+/**
+ * 6. Crystalline Magical Waterfall: Cascading mountain ribbons, crystalline water flows,
+ * billowing splash foam mist, prismatic spray sparkles.
+ */
+private fun DrawScope.drawRealisticMagicalWaterfall(w: Float, h: Float, fastProgress: Float) {
+    // Canyon background
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(Color(0xFF082F49), Color(0xFF0369A1), Color(0xFF0284C7))
+        )
+    )
+
+    // Flanking cliff silhouettes
+    val cliffL = Path().apply {
+        moveTo(0f, 0f)
+        lineTo(w * 0.28f, 0f)
+        lineTo(w * 0.22f, h * 0.4f)
+        lineTo(w * 0.32f, h * 0.75f)
+        lineTo(w * 0.20f, h)
+        lineTo(0f, h)
+        close()
+    }
+    drawPath(path = cliffL, color = Color(0xFF082F49))
+
+    val cliffR = Path().apply {
+        moveTo(w, 0f)
+        lineTo(w * 0.72f, 0f)
+        lineTo(w * 0.78f, h * 0.4f)
+        lineTo(w * 0.68f, h * 0.75f)
+        lineTo(w * 0.80f, h)
+        lineTo(w, h)
+        close()
+    }
+    drawPath(path = cliffR, color = Color(0xFF082F49))
+
+    // Main cascading waterfall streams
+    val flowOffset = fastProgress * 80f
+    val streamWidth = w * 0.36f
+    val streamLeft = w * 0.32f
+
+    // Base water torrent
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(Color(0xFF38BDF8), Color(0xFF0284C7), Color(0xFFE0F2FE))
+        ),
+        topLeft = Offset(streamLeft, 0f),
+        size = Size(streamWidth, h * 0.85f)
+    )
+
+    // Animated water ribbons
+    for (i in 0..6) {
+        val rx = streamLeft + i * (streamWidth / 6f)
+        val dashY = (flowOffset + i * 25f) % 60f
+        for (y in 0..12) {
+            val sy = y * 60f + dashY
+            if (sy < h * 0.82f) {
+                drawLine(
+                    color = Color.White.copy(alpha = 0.55f),
+                    start = Offset(rx, sy),
+                    end = Offset(rx, sy + 30f),
+                    strokeWidth = 3f,
+                    cap = StrokeCap.Round
+                )
+            }
+        }
+    }
+
+    // Billowing spray mist cloud at base
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(Color(0xFFE0F2FE).copy(alpha = 0.65f), Color.Transparent),
+            center = Offset(w * 0.5f, h * 0.85f),
+            radius = w * 0.35f
+        ),
+        center = Offset(w * 0.5f, h * 0.85f),
+        radius = w * 0.35f
+    )
+
+    // Expanding splash ripples
+    for (r in 1..3) {
+        val rippleR = (fastProgress * 60f + r * 30f) % 90f
+        val rippleAlpha = (1f - rippleR / 90f).coerceIn(0f, 1f)
+        drawOval(
+            color = Color.White.copy(alpha = 0.4f * rippleAlpha),
+            topLeft = Offset(w * 0.5f - rippleR * 1.5f, h * 0.88f - rippleR * 0.35f),
+            size = Size(rippleR * 3f, rippleR * 0.7f),
+            style = Stroke(width = 2f)
+        )
+    }
+
+    // Prismatic water droplets floating in mist
+    for (i in 0..9) {
+        val dx = w * 0.35f + (i * 0.07f * w) + sin((fastProgress * 4 * PI + i).toDouble()).toFloat() * 15f
+        val dy = h * 0.75f + (i % 4) * 20f - fastProgress * 40f
+        drawCircle(
+            color = Color(0xFFBAE6FD).copy(alpha = 0.75f),
+            center = Offset(dx, dy),
+            radius = 3f
+        )
+    }
+}
+
+/**
+ * 7. Realistic Butterflies: Detailed patterned Monarch & Swallowtail wings,
+ * graceful wing flapping, figure-8 curved flight paths above twilight meadow.
+ */
+private fun DrawScope.drawRealisticButterflyHaven(w: Float, h: Float, progress: Float, fastProgress: Float) {
+    // Twilight Lavender Backdrop
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(Color(0xFF2E1065), Color(0xFF581C87), Color(0xFF7E22CE))
+        )
+    )
+
+    // Bottom soft floral silhouettes
+    for (i in 0..7) {
+        val fx = w * (0.06f + i * 0.13f)
+        drawLine(
+            color = Color(0xFF1E1B4B).copy(alpha = 0.6f),
+            start = Offset(fx, h),
+            end = Offset(fx + 10f, h * 0.82f),
+            strokeWidth = 3f
+        )
+        drawCircle(
+            color = Color(0xFFA855F7).copy(alpha = 0.35f),
+            center = Offset(fx + 10f, h * 0.82f),
+            radius = 14f
+        )
+    }
+
+    // 3 Detailed Butterflies
+    fun drawButterfly(bx: Float, by: Float, bScale: Float, flapPhase: Float, angle: Float) {
+        val flap = abs(cos((fastProgress * 6 * PI + flapPhase).toDouble()).toFloat()).coerceIn(0.18f, 1f)
+        val wingSpan = 38f * bScale * flap
+
+        rotate(angle, pivot = Offset(bx, by)) {
+            // Luminous fairy trail
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFFFDE047).copy(alpha = 0.35f), Color.Transparent),
+                    center = Offset(bx, by),
+                    radius = 28f * bScale
+                ),
+                center = Offset(bx, by),
+                radius = 28f * bScale
+            )
+
+            // Left Upper Wing (Monarch Orange + Black margin)
+            drawOval(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFFF97316), Color(0xFFEA580C), Color(0xFF1E293B)),
+                    center = Offset(bx - wingSpan * 0.5f, by - 12f * bScale),
+                    radius = wingSpan
+                ),
+                topLeft = Offset(bx - wingSpan, by - 26f * bScale),
+                size = Size(wingSpan, 32f * bScale)
+            )
+            // Left Lower Wing
+            drawOval(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFFFB923C), Color(0xFFC2410C), Color(0xFF0F172A)),
+                    center = Offset(bx - wingSpan * 0.4f, by + 10f * bScale),
+                    radius = wingSpan * 0.8f
+                ),
+                topLeft = Offset(bx - wingSpan * 0.85f, by - 2f * bScale),
+                size = Size(wingSpan * 0.85f, 26f * bScale)
+            )
+
+            // Right Upper Wing
+            drawOval(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFFF97316), Color(0xFFEA580C), Color(0xFF1E293B)),
+                    center = Offset(bx + wingSpan * 0.5f, by - 12f * bScale),
+                    radius = wingSpan
+                ),
+                topLeft = Offset(bx, by - 26f * bScale),
+                size = Size(wingSpan, 32f * bScale)
+            )
+            // Right Lower Wing
+            drawOval(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFFFB923C), Color(0xFFC2410C), Color(0xFF0F172A)),
+                    center = Offset(bx + wingSpan * 0.4f, by + 10f * bScale),
+                    radius = wingSpan * 0.8f
+                ),
+                topLeft = Offset(bx, by - 2f * bScale),
+                size = Size(wingSpan * 0.85f, 26f * bScale)
+            )
+
+            // Butterfly Slender Body & Antennae
+            drawOval(
+                color = Color(0xFF0F172A),
+                topLeft = Offset(bx - 3f * bScale, by - 16f * bScale),
+                size = Size(6f * bScale, 32f * bScale)
+            )
+            drawLine(
+                color = Color(0xFF0F172A),
+                start = Offset(bx, by - 14f * bScale),
+                end = Offset(bx - 8f * bScale, by - 26f * bScale),
+                strokeWidth = 1.5f * bScale
+            )
+            drawLine(
+                color = Color(0xFF0F172A),
+                start = Offset(bx, by - 14f * bScale),
+                end = Offset(bx + 8f * bScale, by - 26f * bScale),
+                strokeWidth = 1.5f * bScale
+            )
+        }
+    }
+
+    // Flight paths along sinusoidal loops
+    val b1X = w * 0.35f + sin((progress * 2 * PI).toDouble()).toFloat() * (w * 0.25f)
+    val b1Y = h * 0.38f + cos((progress * 4 * PI).toDouble()).toFloat() * (h * 0.12f)
+    drawButterfly(b1X, b1Y, 1.15f, 0f, sin((progress * 2 * PI).toDouble()).toFloat() * 15f)
+
+    val b2X = w * 0.68f + cos((progress * 2 * PI + 1.5).toDouble()).toFloat() * (w * 0.20f)
+    val b2Y = h * 0.58f + sin((progress * 3 * PI).toDouble()).toFloat() * (h * 0.14f)
+    drawButterfly(b2X, b2Y, 0.9f, 2f, -cos((progress * 2 * PI).toDouble()).toFloat() * 18f)
+
+    val b3X = w * 0.22f + sin((progress * 2 * PI + 3.0).toDouble()).toFloat() * (w * 0.15f)
+    val b3Y = h * 0.68f + cos((progress * 3 * PI).toDouble()).toFloat() * (h * 0.10f)
+    drawButterfly(b3X, b3Y, 0.75f, 4f, 10f)
+}
+
+/**
+ * 8. Firefly Glade: Deep nocturnal glade, rolling meadows, starry nebula sky,
+ * organic harmonic blinking fireflies with realistic soft radial dissipation.
+ */
+private fun DrawScope.drawRealisticFireflyGlade(w: Float, h: Float, progress: Float, pulse: Float) {
+    // Nocturnal sky
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(Color(0xFF020617), Color(0xFF0F172A), Color(0xFF1E293B))
+        )
+    )
+
+    // Distant warm horizon glow
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(Color(0xFF1E3A8A).copy(alpha = 0.35f), Color.Transparent),
+            center = Offset(w * 0.5f, h * 0.75f),
+            radius = w * 0.6f
+        ),
+        center = Offset(w * 0.5f, h * 0.75f),
+        radius = w * 0.6f
+    )
+
+    // Meadow hill silhouette
+    val hillPath = Path().apply {
+        moveTo(0f, h * 0.75f)
+        quadraticTo(w * 0.3f, h * 0.68f, w * 0.6f, h * 0.78f)
+        quadraticTo(w * 0.85f, h * 0.72f, w, h * 0.76f)
+        lineTo(w, h)
+        lineTo(0f, h)
+        close()
+    }
+    drawPath(path = hillPath, color = Color(0xFF020617))
+
+    // 14 Organic Blinking Fireflies
+    for (i in 0..13) {
+        val speedX = 1f + (i % 3) * 0.35f
+        val speedY = 1.2f + (i % 4) * 0.25f
+        val fx = (w * (0.08f + i * 0.068f) + sin((progress * 2 * PI * speedX + i).toDouble()).toFloat() * 28f)
+        val fy = (h * (0.25f + (i * 0.19f) % 0.55f) + cos((progress * 2 * PI * speedY + i * 2).toDouble()).toFloat() * 20f)
+
+        val flash = sin((progress * 6 * PI + i * 1.6f).toDouble()).toFloat().coerceAtLeast(0f)
+        val blink = flash * flash
+
+        if (blink > 0.05f) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFFBAFF9C).copy(alpha = 0.75f * blink),
+                        Color(0xFF4ADE80).copy(alpha = 0.22f * blink),
+                        Color.Transparent
+                    ),
+                    center = Offset(fx, fy),
+                    radius = 22f
+                ),
+                center = Offset(fx, fy),
+                radius = 22f
+            )
+            drawCircle(
+                color = Color(0xFFFEF08A).copy(alpha = blink),
+                center = Offset(fx, fy),
+                radius = 3.5f
+            )
+        }
+    }
+}
+
+/**
+ * 9. Whispering Cherry Grove: Japanese twilight, silhouetted pagoda & boughs,
+ * multi-depth sakura petal storm swirling along wind eddies with depth of field.
+ */
+private fun DrawScope.drawRealisticFloatingPetals(w: Float, h: Float, progress: Float) {
+    // Dusk twilight
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(Color(0xFF3B0724), Color(0xFF500724), Color(0xFF831843))
+        )
+    )
+
+    // Pagoda eave silhouette at top-left
+    val pagodaPath = Path().apply {
+        moveTo(0f, 0f)
+        lineTo(w * 0.35f, 0f)
+        quadraticTo(w * 0.28f, h * 0.12f, w * 0.42f, h * 0.15f)
+        lineTo(0f, h * 0.22f)
+        close()
+    }
+    drawPath(path = pagodaPath, color = Color(0xFF1E0312).copy(alpha = 0.85f))
+
+    // Cherry bough silhouette at top-right
+    val boughPath = Path().apply {
+        moveTo(w, 0f)
+        lineTo(w * 0.65f, 0f)
+        quadraticTo(w * 0.72f, h * 0.16f, w * 0.58f, h * 0.20f)
+        lineTo(w, h * 0.28f)
+        close()
+    }
+    drawPath(path = boughPath, color = Color(0xFF1E0312).copy(alpha = 0.85f))
+
+    // Sakura Petal Storm (Foreground, Midground, Background)
+    for (i in 0..17) {
+        val layer = i % 3
+        val speed = when (layer) {
+            0 -> 1.3f
+            1 -> 0.9f
+            else -> 0.55f
+        }
+        val petalSize = when (layer) {
+            0 -> 24f
+            1 -> 16f
+            else -> 10f
+        }
+        val alpha = when (layer) {
+            0 -> 0.95f
+            1 -> 0.80f
+            else -> 0.45f
+        }
+
+        val t = (progress * speed + i * 0.055f) % 1f
+        val windDrift = sin((progress * 3 * PI + i).toDouble()).toFloat() * 35f
+        val px = (w * (i * 0.058f) + t * w + windDrift) % (w + 40f) - 20f
+        val py = (h * 0.1f + t * h * 0.85f)
+        val rot = (progress * 360f * speed + i * 45f) % 360f
+
+        rotate(rot, pivot = Offset(px, py)) {
+            drawOval(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFFFFF1F2).copy(alpha = alpha), Color(0xFFFB7185).copy(alpha = alpha), Color(0xFFE11D48).copy(alpha = alpha * 0.7f)),
+                    center = Offset(px, py),
+                    radius = petalSize
+                ),
+                topLeft = Offset(px - petalSize * 0.5f, py - petalSize),
+                size = Size(petalSize, petalSize * 1.8f)
+            )
+        }
+    }
+}
+
+/**
+ * 10. Luxury Gold & Velvet: Regal royal purple & burgundy drapes,
+ * multifaceted chandelier crystal refractions, floating golden embers & champagne bokeh.
+ */
+private fun DrawScope.drawRealisticLuxuryRomantic(w: Float, h: Float, progress: Float, pulse: Float) {
+    // Royal velvet gradient
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(Color(0xFF1C0A26), Color(0xFF3B0764), Color(0xFF4C0519))
+        )
+    )
+
+    // Velvet drape fold highlights
+    for (i in 0..4) {
+        val dx = w * (i * 0.25f)
+        drawOval(
+            brush = Brush.horizontalGradient(
+                colors = listOf(Color.Transparent, Color(0xFF581C87).copy(alpha = 0.45f), Color.Transparent),
+                startX = dx - 40f,
+                endX = dx + 40f
+            ),
+            topLeft = Offset(dx - 40f, 0f),
+            size = Size(80f, h)
+        )
+    }
+
+    // Chandelier crystal pendants along top
+    for (c in 0..6) {
+        val cx = w * (0.12f + c * 0.13f)
+        val cy = h * (0.08f + (c % 3) * 0.04f)
+        drawLine(
+            color = Color(0xFFFDE047).copy(alpha = 0.65f),
+            start = Offset(cx, 0f),
+            end = Offset(cx, cy),
+            strokeWidth = 1.5f
+        )
+        val sparkle = 0.5f + 0.5f * sin((progress * 4 * PI + c * 1.2).toDouble()).toFloat()
+        drawCircle(
+            color = Color(0xFFFACC15).copy(alpha = 0.35f * sparkle),
+            center = Offset(cx, cy),
+            radius = 16f * sparkle
+        )
+        drawCircle(
+            color = Color(0xFFFFFBEB),
+            center = Offset(cx, cy),
+            radius = 4f
+        )
+    }
+
+    // Floating golden champagne bokeh discs
+    for (i in 0..11) {
+        val t = (progress * 0.5f + i * 0.08f) % 1f
+        val bx = (w * (0.1f + i * 0.08f) + sin((progress * 2 * PI + i).toDouble()).toFloat() * 18f)
+        val by = h * (1f - t)
+        val bRadius = 16f + (i % 4) * 8f
+        val bAlpha = (0.25f + 0.25f * sin((progress * 3 * PI + i).toDouble()).toFloat())
+
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color(0xFFFDE047).copy(alpha = bAlpha),
+                    Color(0xFFEAB308).copy(alpha = bAlpha * 0.4f),
+                    Color.Transparent
+                ),
+                center = Offset(bx, by),
+                radius = bRadius
+            ),
+            center = Offset(bx, by),
+            radius = bRadius
+        )
+    }
+}
+
+/**
+ * 11. 3D Golden Lion: Serengeti twilight, acacia silhouette,
+ * 3D lion head with flowing golden mane, breathing animation, piercing amber eyes.
+ */
+private fun DrawScope.drawRealistic3dLion(w: Float, h: Float, fastProgress: Float, pulse: Float) {
+    // Savanna sunset
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(Color(0xFF451A03), Color(0xFF78350F), Color(0xFF92400E))
+        )
+    )
+
+    // Acacia tree silhouette in background
+    val acaciaX = w * 0.82f
+    val acaciaY = h * 0.62f
+    drawLine(
+        color = Color(0xFF291002).copy(alpha = 0.8f),
+        start = Offset(acaciaX, h * 0.75f),
+        end = Offset(acaciaX, acaciaY),
+        strokeWidth = 6f
+    )
+    drawOval(
+        color = Color(0xFF291002).copy(alpha = 0.8f),
+        topLeft = Offset(acaciaX - 45f, acaciaY - 14f),
+        size = Size(90f, 24f)
+    )
+
+    // 3D Lion Center & Breathing physics
+    val breathY = sin((pulse * PI).toDouble()).toFloat() * (h * 0.015f)
+    val cx = w * 0.5f
+    val cy = h * 0.55f + breathY
+    val lScale = min(w, h) * 0.0028f
+
+    // 1. Volumetric Golden Mane (Layered radiating locks)
+    val maneCount = 14
+    for (layer in 0..2) {
+        val maneR = (90f - layer * 15f) * lScale
+        val maneColors = when (layer) {
+            0 -> listOf(Color(0xFF78350F), Color(0xFF451A03))
+            1 -> listOf(Color(0xFFB45309), Color(0xFF78350F))
+            else -> listOf(Color(0xFFF59E0B), Color(0xFFB45309))
+        }
+        for (m in 0 until maneCount) {
+            val ang = Math.toRadians((m * (360f / maneCount) + layer * 12f).toDouble())
+            val mx = cx + (cos(ang) * maneR * 0.7f).toFloat()
+            val my = cy + (sin(ang) * maneR * 0.7f).toFloat()
+
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = maneColors,
+                    center = Offset(mx, my),
+                    radius = maneR * 0.6f
+                ),
+                center = Offset(mx, my),
+                radius = maneR * 0.55f
+            )
+        }
+    }
+
+    // 2. 3D Head Base
+    val headR = 64f * lScale
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(Color(0xFFFCD34D), Color(0xFFD97706), Color(0xFF92400E)),
+            center = Offset(cx, cy - 10f * lScale),
+            radius = headR
+        ),
+        center = Offset(cx, cy),
+        radius = headR
+    )
+
+    // 3. Muzzle (Cheeks)
+    drawOval(
+        color = Color(0xFFFEF3C7),
+        topLeft = Offset(cx - 32f * lScale, cy + 8f * lScale),
+        size = Size(32f * lScale, 26f * lScale)
+    )
+    drawOval(
+        color = Color(0xFFFEF3C7),
+        topLeft = Offset(cx, cy + 8f * lScale),
+        size = Size(32f * lScale, 26f * lScale)
+    )
+
+    // Dark Nose
+    val nosePath = Path().apply {
+        moveTo(cx - 14f * lScale, cy + 6f * lScale)
+        lineTo(cx + 14f * lScale, cy + 6f * lScale)
+        lineTo(cx, cy + 20f * lScale)
+        close()
+    }
+    drawPath(path = nosePath, color = Color(0xFF1C1917))
+
+    // 4. Piercing Amber Eyes
+    val eyeY = cy - 16f * lScale
+    val eyeW = 16f * lScale
+    val eyeH = 10f * lScale
+
+    // Left Eye
+    drawOval(
+        color = Color(0xFFD97706),
+        topLeft = Offset(cx - 32f * lScale, eyeY),
+        size = Size(eyeW, eyeH)
+    )
+    drawCircle(
+        color = Color(0xFF1C1917),
+        center = Offset(cx - 24f * lScale, eyeY + 5f * lScale),
+        radius = 3.5f * lScale
+    )
+    drawCircle(
+        color = Color.White,
+        center = Offset(cx - 25f * lScale, eyeY + 3f * lScale),
+        radius = 1.8f * lScale
+    )
+
+    // Right Eye
+    drawOval(
+        color = Color(0xFFD97706),
+        topLeft = Offset(cx + 16f * lScale, eyeY),
+        size = Size(eyeW, eyeH)
+    )
+    drawCircle(
+        color = Color(0xFF1C1917),
+        center = Offset(cx + 24f * lScale, eyeY + 5f * lScale),
+        radius = 3.5f * lScale
+    )
+    drawCircle(
+        color = Color.White,
+        center = Offset(cx + 23f * lScale, eyeY + 3f * lScale),
+        radius = 1.8f * lScale
+    )
 }
 
 /**

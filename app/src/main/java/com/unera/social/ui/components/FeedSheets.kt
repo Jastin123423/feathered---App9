@@ -732,16 +732,57 @@ fun DiscussionsSheetDialog(
     LaunchedEffect(post.id) {
         val fetched = FeedInteractionApiService.fetchComments(post, currentUser.id)
         if (fetched.isNotEmpty() || post.comments.isEmpty()) {
-            liveComments = fetched
+            val pending = liveComments.filter { it.id < 0 }
+            val filteredPending = pending.filter { p ->
+                fetched.none { f -> (f.author.id == p.author.id || f.author.id == currentUser.id) && f.text.trim() == p.text.trim() }
+            }
+            liveComments = filteredPending + fetched
         }
         isLoadingComments = false
     }
 
     LaunchedEffect(post.comments) {
         if (post.comments.isNotEmpty()) {
-            val missing = post.comments.filter { pc -> liveComments.none { lc -> lc.id == pc.id } }
-            if (missing.isNotEmpty()) {
-                liveComments = missing + liveComments
+            val updated = liveComments.toMutableList()
+            var changed = false
+            for (pc in post.comments) {
+                val existingIndex = updated.indexOfFirst { lc ->
+                    lc.id == pc.id ||
+                    (lc.id < 0 && (lc.author.id == pc.author.id || lc.author.id == currentUser.id) && lc.text.trim() == pc.text.trim())
+                }
+                if (existingIndex >= 0) {
+                    val current = updated[existingIndex]
+                    val bestAuthor = if (pc.author.profileImageUrl.isNotBlank() && pc.author.name.isNotBlank()) {
+                        pc.author
+                    } else if (current.author.profileImageUrl.isNotBlank() && current.author.name.isNotBlank()) {
+                        current.author
+                    } else {
+                        currentUser
+                    }
+                    val reconciled = pc.copy(
+                        author = bestAuthor.copy(
+                            isVerified = bestAuthor.isVerified || current.author.isVerified || (currentUser.isVerified && (bestAuthor.id == currentUser.id || current.author.id == currentUser.id)),
+                            profileImageUrl = bestAuthor.profileImageUrl.ifBlank { current.author.profileImageUrl.ifBlank { currentUser.profileImageUrl } }
+                        ),
+                        text = pc.text.ifBlank { current.text }
+                    )
+                    if (updated[existingIndex] != reconciled) {
+                        updated[existingIndex] = reconciled
+                        changed = true
+                    }
+                } else {
+                    updated.add(0, pc)
+                    changed = true
+                }
+            }
+            val finalClean = updated.filter { c ->
+                if (c.id < 0) {
+                    updated.none { other -> other.id > 0 && other.text.trim() == c.text.trim() && (other.author.id == c.author.id || other.author.id == currentUser.id) }
+                } else true
+            }.distinctBy { it.id }
+
+            if (changed || finalClean.size != liveComments.size) {
+                liveComments = finalClean
             }
         }
     }
@@ -1144,6 +1185,15 @@ fun DiscussionsSheetDialog(
                         onClick = {
                             if (canSend) {
                                 val fullText = if (replyingTo != null) "@$replyingTo $newCommentText" else newCommentText
+                                val tempId = -System.currentTimeMillis()
+                                val optimistic = Comment(
+                                    id = tempId,
+                                    author = currentUser,
+                                    text = fullText,
+                                    timestamp = "Just now",
+                                    imageUrl = selectedImageUri?.toString()
+                                )
+                                liveComments = listOf(optimistic) + liveComments.filter { it.id != tempId }
                                 onAddComment(fullText)
                                 newCommentText = ""
                                 selectedImageUri = null

@@ -226,6 +226,7 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
         val savedUser = UserSessionManager.getSavedUser(context)
         val savedToken = UserSessionManager.getAuthToken(context)
         if (savedUser != null && savedUser.id > 0L) {
+            UserSessionManager.setCurrentUser(savedUser)
             _uiState.update {
                 it.copy(
                     currentUser = savedUser,
@@ -257,6 +258,7 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
                             followersCount = if (fresh.followersCount > 0) fresh.followersCount else savedUser.followersCount,
                             followingCount = if (fresh.followingCount > 0) fresh.followingCount else savedUser.followingCount
                         )
+                        UserSessionManager.setCurrentUser(updated)
                         _uiState.update { it.copy(currentUser = updated) }
                         UserSessionManager.saveAuth(context, savedToken, updated)
                     }
@@ -876,9 +878,12 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
         val post = _uiState.value.posts.find { it.id == postId }
             ?: _uiState.value.videoPosts.find { it.id == postId }
             ?: _uiState.value.selectedPostForComments
+
+        val tempId = -System.currentTimeMillis()
+        val author = _uiState.value.currentUser
         val newComment = Comment(
-            id = System.currentTimeMillis(),
-            author = _uiState.value.currentUser,
+            id = tempId,
+            author = author,
             text = commentText.trim(),
             timestamp = "Just now"
         )
@@ -886,7 +891,7 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
             val updatedPosts = state.posts.map { p ->
                 if (p.id == postId) {
                     p.copy(
-                        comments = listOf(newComment) + p.comments,
+                        comments = listOf(newComment) + p.comments.filter { it.id != tempId },
                         commentsCount = p.commentsCount + 1
                     )
                 } else p
@@ -894,7 +899,7 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
             val updatedVideoPosts = state.videoPosts.map { p ->
                 if (p.id == postId) {
                     p.copy(
-                        comments = listOf(newComment) + p.comments,
+                        comments = listOf(newComment) + p.comments.filter { it.id != tempId },
                         commentsCount = p.commentsCount + 1
                     )
                 } else p
@@ -906,48 +911,118 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
                     if (prod.id == pid) prod.copy(commentsCount = prod.commentsCount + 1) else prod
                 }
             } else state.products
+            val updatedSel = if (state.selectedPostForComments?.id == postId) {
+                state.selectedPostForComments?.copy(
+                    comments = listOf(newComment) + (state.selectedPostForComments?.comments?.filter { it.id != tempId } ?: emptyList()),
+                    commentsCount = (state.selectedPostForComments?.commentsCount ?: 0) + 1
+                )
+            } else state.selectedPostForComments
             state.copy(
                 posts = updatedPosts,
                 videoPosts = updatedVideoPosts,
                 products = updatedProducts,
-                selectedPostForComments = updatedPosts.find { it.id == postId } ?: updatedVideoPosts.find { it.id == postId }
+                selectedPostForComments = updatedSel
             )
         }
 
         val targetPost = post ?: Post(id = postId, author = _uiState.value.currentUser, content = "", timestamp = "")
         viewModelScope.launch {
-            val liveComment = FeedInteractionApiService.addComment(
+            val result = FeedInteractionApiService.addComment(
                 post = targetPost,
                 userId = _uiState.value.currentUser.id,
                 text = commentText.trim()
             )
+            val liveComment = result?.comment
+            val serverCommentsCount = result?.commentsCount
+
             if (liveComment != null) {
+                val fullLiveComment = liveComment.copy(
+                    author = liveComment.author.copy(
+                        name = liveComment.author.name.ifBlank { author.name },
+                        profileImageUrl = liveComment.author.profileImageUrl.ifBlank { author.profileImageUrl },
+                        isVerified = liveComment.author.isVerified || author.isVerified
+                    )
+                )
+
                 _uiState.update { state ->
                     val updatedPosts = state.posts.map { p ->
                         if (p.id == postId) {
+                            val finalCount = serverCommentsCount ?: p.commentsCount
+                            val reconciled = p.comments.map { c ->
+                                if (c.id == tempId || (c.id < 0 && c.text.trim() == newComment.text.trim() && c.author.id == author.id)) {
+                                    fullLiveComment
+                                } else c
+                            }.distinctBy { it.id }
                             p.copy(
-                                comments = listOf(liveComment) + p.comments.filter { it.id != newComment.id }
+                                comments = if (reconciled.any { it.id == fullLiveComment.id }) reconciled else listOf(fullLiveComment) + reconciled,
+                                commentsCount = finalCount
                             )
                         } else p
                     }
                     val updatedVideoPosts = state.videoPosts.map { p ->
                         if (p.id == postId) {
+                            val finalCount = serverCommentsCount ?: p.commentsCount
+                            val reconciled = p.comments.map { c ->
+                                if (c.id == tempId || (c.id < 0 && c.text.trim() == newComment.text.trim() && c.author.id == author.id)) {
+                                    fullLiveComment
+                                } else c
+                            }.distinctBy { it.id }
                             p.copy(
-                                comments = listOf(liveComment) + p.comments.filter { it.id != newComment.id }
+                                comments = if (reconciled.any { it.id == fullLiveComment.id }) reconciled else listOf(fullLiveComment) + reconciled,
+                                commentsCount = finalCount
                             )
                         } else p
                     }
                     val updatedSel = if (state.selectedPostForComments?.id == postId) {
+                        val finalCount = serverCommentsCount ?: (state.selectedPostForComments?.commentsCount ?: 1)
+                        val existing = state.selectedPostForComments?.comments ?: emptyList()
+                        val reconciled = existing.map { c ->
+                            if (c.id == tempId || (c.id < 0 && c.text.trim() == newComment.text.trim() && c.author.id == author.id)) {
+                                fullLiveComment
+                            } else c
+                        }.distinctBy { it.id }
                         state.selectedPostForComments?.copy(
-                            comments = listOf(liveComment) + (state.selectedPostForComments?.comments?.filter { it.id != newComment.id } ?: emptyList())
+                            comments = if (reconciled.any { it.id == fullLiveComment.id }) reconciled else listOf(fullLiveComment) + reconciled,
+                            commentsCount = finalCount
                         )
                     } else state.selectedPostForComments
+
                     state.copy(
                         posts = updatedPosts,
                         videoPosts = updatedVideoPosts,
                         selectedPostForComments = updatedSel
                     )
                 }
+            }
+
+            // fetchCommentsSilently() to reconcile from database
+            try {
+                val freshComments = FeedInteractionApiService.fetchComments(targetPost, _uiState.value.currentUser.id)
+                if (freshComments.isNotEmpty()) {
+                    _uiState.update { state ->
+                        val updatedPosts = state.posts.map { p ->
+                            if (p.id == postId) {
+                                p.copy(comments = freshComments)
+                            } else p
+                        }
+                        val updatedVideoPosts = state.videoPosts.map { p ->
+                            if (p.id == postId) {
+                                p.copy(comments = freshComments)
+                            } else p
+                        }
+                        val updatedSel = if (state.selectedPostForComments?.id == postId) {
+                            state.selectedPostForComments?.copy(comments = freshComments)
+                        } else state.selectedPostForComments
+
+                        state.copy(
+                            posts = updatedPosts,
+                            videoPosts = updatedVideoPosts,
+                            selectedPostForComments = updatedSel
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
@@ -3868,17 +3943,25 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
                 postType = "group_post",
                 groupId = groupPost?.groupId
             )
-            val createdComment = FeedInteractionApiService.addComment(
+            val result = FeedInteractionApiService.addComment(
                 post = postObj,
                 userId = currentUserId,
                 text = text
             )
+            val createdComment = result?.comment
             if (createdComment != null) {
+                val fullCreatedComment = createdComment.copy(
+                    author = createdComment.author.copy(
+                        name = createdComment.author.name.ifBlank { _uiState.value.currentUser.name },
+                        profileImageUrl = createdComment.author.profileImageUrl.ifBlank { _uiState.value.currentUser.profileImageUrl },
+                        isVerified = createdComment.author.isVerified || _uiState.value.currentUser.isVerified
+                    )
+                )
                 _uiState.update { state ->
                     val updated = state.groupPosts.map { post ->
                         if (post.id == postId) {
                             post.copy(
-                                comments = post.comments.filter { it.id != newComment.id } + createdComment
+                                comments = post.comments.filter { it.id != newComment.id } + fullCreatedComment
                             )
                         } else post
                     }

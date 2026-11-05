@@ -326,6 +326,11 @@ object FeedInteractionApiService {
         commentsList
     }
 
+data class AddCommentResult(
+    val comment: Comment,
+    val commentsCount: Int? = null
+)
+
     /**
      * Submit a new live comment matching App.tsx createComment
      */
@@ -335,7 +340,7 @@ object FeedInteractionApiService {
         text: String,
         parentCommentId: Long? = null,
         imageUrl: String? = null
-    ): Comment? = withContext(Dispatchers.IO) {
+    ): AddCommentResult? = withContext(Dispatchers.IO) {
         val isGroup = post.groupId != null || post.postType == "group_post"
         val isMusic = post.song != null || post.postType == "music" || post.postType == "song"
         val isProduct = post.product != null || post.postType == "product" || post.postType == "marketplace"
@@ -419,7 +424,53 @@ object FeedInteractionApiService {
                         ?: root.optJSONObject("review")
                         ?: root.optJSONObject("data")
                         ?: root
-                    return@withContext parseComment(commentObj, userId)
+
+                    val serverCommentsCount = if (root.has("comments_count") && !root.isNull("comments_count")) {
+                        root.optInt("comments_count")
+                    } else if (commentObj.has("comments_count") && !commentObj.isNull("comments_count")) {
+                        commentObj.optInt("comments_count")
+                    } else null
+
+                    val serverId = commentObj.optLong("id", System.currentTimeMillis())
+                    val serverCreatedAt = commentObj.optString("created_at").takeIf { it.isNotBlank() && it != "null" }
+                    val serverText = (commentObj.optString("text").takeIf { it.isNotBlank() && it != "null" }
+                        ?: commentObj.optString("content").takeIf { it.isNotBlank() && it != "null" }
+                        ?: text).trim()
+                    val serverImage = commentObj.optString("image_url").takeIf { it.isNotBlank() && it != "null" } ?: imageUrl
+                    val serverParentId = if (commentObj.has("parent_comment_id") && !commentObj.isNull("parent_comment_id")) {
+                        commentObj.optLong("parent_comment_id")
+                    } else if (commentObj.has("parent_id") && !commentObj.isNull("parent_id")) {
+                        commentObj.optLong("parent_id")
+                    } else parentCommentId
+
+                    val parsed = parseComment(commentObj, userId)
+                    val currentUser = UserSessionManager.getCurrentUser()
+                    val finalAuthor = if (parsed != null && parsed.author.name.isNotBlank() && parsed.author.id > 0) {
+                        parsed.author.copy(
+                            name = parsed.author.name.ifBlank { currentUser?.name ?: "You" },
+                            profileImageUrl = parsed.author.profileImageUrl.ifBlank { currentUser?.profileImageUrl ?: "" },
+                            isVerified = parsed.author.isVerified || (currentUser?.isVerified == true && (parsed.author.id == currentUser.id || parsed.author.id == userId))
+                        )
+                    } else {
+                        currentUser ?: User(id = userId, name = "You", username = "", profileImageUrl = "", isVerified = false)
+                    }
+
+                    val finalComment = Comment(
+                        id = serverId,
+                        author = finalAuthor,
+                        text = serverText,
+                        timestamp = if (serverCreatedAt != null) PostsApiService.formatRelativeTime(serverCreatedAt) else "Just now",
+                        likesCount = parsed?.likesCount ?: 0,
+                        isLiked = parsed?.isLiked ?: false,
+                        imageUrl = serverImage,
+                        parentCommentId = serverParentId,
+                        isHidden = parsed?.isHidden ?: false
+                    )
+
+                    return@withContext AddCommentResult(
+                        comment = finalComment,
+                        commentsCount = serverCommentsCount
+                    )
                 }
             } else {
                 conn.disconnect()
@@ -765,14 +816,17 @@ object FeedInteractionApiService {
         val text = obj.optString("text").takeIf { it != "null" }
             ?: obj.optString("content").takeIf { it != "null" }
             ?: ""
-        val userId = obj.optLong("user_id", 0L)
+        val userId = obj.optLong("user_id", obj.optLong("userId", 0L))
         val userObj = obj.optJSONObject("user") ?: obj.optJSONObject("author")
 
         val authorName = userObj?.optString("name")?.takeIf { it.isNotBlank() && it != "null" }
             ?: userObj?.optString("display_name")?.takeIf { it.isNotBlank() && it != "null" }
+            ?: userObj?.optString("fullName")?.takeIf { it.isNotBlank() && it != "null" }
             ?: obj.optString("author_name").takeIf { it.isNotBlank() && it != "null" }
             ?: obj.optString("user_name").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("user_fullname").takeIf { it.isNotBlank() && it != "null" }
             ?: userObj?.optString("username")?.takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("username").takeIf { it.isNotBlank() && it != "null" }
             ?: ""
 
         val username = userObj?.optString("username")?.takeIf { it.isNotBlank() && it != "null" }
@@ -784,6 +838,8 @@ object FeedInteractionApiService {
             ?: userObj?.optString("avatar")?.takeIf { it.isNotBlank() && it != "null" }
             ?: obj.optString("author_avatar").takeIf { it.isNotBlank() && it != "null" }
             ?: obj.optString("profile_image_url").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("user_avatar").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("user_avatar_url").takeIf { it.isNotBlank() && it != "null" }
             ?: obj.optString("avatar").takeIf { it.isNotBlank() && it != "null" }
             ?: ""
 
@@ -791,14 +847,25 @@ object FeedInteractionApiService {
             (userObj?.optInt("is_verified", 0) == 1) ||
             (obj.optInt("is_verified", 0) == 1) ||
             (userObj?.optBoolean("isVerified") ?: obj.optBoolean("isVerified", false)) ||
-            (userObj?.optBoolean("verified") ?: obj.optBoolean("verified", false))
+            (userObj?.optBoolean("verified") ?: obj.optBoolean("verified", false)) ||
+            (obj.optBoolean("verified", false))
+
+        val loggedInUser = UserSessionManager.getCurrentUser()
+        val isMe = (loggedInUser != null && (userId == loggedInUser.id || (userId <= 0 && viewerId == loggedInUser.id))) ||
+                   (viewerId > 0 && userId == viewerId)
+
+        val resolvedName = if (authorName.isNotBlank()) authorName else if (isMe && loggedInUser != null) loggedInUser.name else username.removePrefix("@").ifBlank { "User" }
+        val resolvedUsername = if (username.isNotBlank()) username else if (isMe && loggedInUser != null) loggedInUser.username else if (resolvedName.isNotBlank()) "@${resolvedName.lowercase().replace(" ", "")}" else ""
+        val resolvedAvatar = if (avatar.isNotBlank()) avatar else if (isMe && loggedInUser != null) loggedInUser.profileImageUrl else ""
+        val resolvedVerified = isVerified || (isMe && loggedInUser?.isVerified == true)
+        val resolvedUserId = if (userId > 0) userId else if (isMe && loggedInUser != null) loggedInUser.id else viewerId
 
         val author = User(
-            id = userId,
-            name = authorName.ifBlank { username.removePrefix("@") },
-            username = username,
-            profileImageUrl = avatar,
-            isVerified = isVerified
+            id = resolvedUserId,
+            name = resolvedName,
+            username = resolvedUsername,
+            profileImageUrl = resolvedAvatar,
+            isVerified = resolvedVerified
         )
 
         val rawDate = obj.optString("created_at").takeIf { it.isNotBlank() && it != "null" }

@@ -99,7 +99,7 @@ fun CreatePostModal(
     var content by remember { mutableStateOf("") }
     var mediaUrls by remember { mutableStateOf(if (!initialMediaUrl.isNullOrBlank()) listOf(initialMediaUrl) else emptyList<String>()) }
     var activeBackground by remember { mutableStateOf<TextPostBackgroundTemplate?>(null) }
-    var activeCategory by remember { mutableStateOf(AnimatedBgCategory.FLOWERS) }
+    var activeCategory by remember { mutableStateOf(AnimatedBgCategory.REALISTIC) }
     var textAlignment by remember { mutableStateOf(TextAlign.Center) }
     var textTextColor by remember { mutableStateOf(Color.White) }
     var textFontStyle by remember { mutableStateOf("bold") }

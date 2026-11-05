@@ -7,6 +7,7 @@ import androidx.compose.ui.text.style.TextAlign
  * Animated Background Categories for text posts.
  */
 enum class AnimatedBgCategory(val label: String, val emoji: String) {
+    REALISTIC("Realistic", "🌟"),
     EXISTING("Classic", "🎨"),
     FLOWERS("Flowers", "🌸"),
     CHARACTERS_3D("3D Characters", "🧸"),
@@ -390,6 +391,109 @@ val ALL_TEXT_POST_BACKGROUNDS: List<TextPostBackgroundTemplate> = listOf(
         baseColors = listOf(Color(0xFF431407), Color(0xFF7C2D12), Color(0xFFD97706)),
         styleString = "animated:sunset_clouds",
         iconEmoji = "🌅",
+        isAnimated = true
+    ),
+
+    // ==========================================
+    // 9. REALISTIC ENVIRONMENTS & 3D (ANIMATED)
+    // ==========================================
+    TextPostBackgroundTemplate(
+        id = "animated:realistic_magical_garden",
+        label = "Magical Garden",
+        category = AnimatedBgCategory.REALISTIC,
+        baseColors = listOf(Color(0xFF080D35), Color(0xFF45246F), Color(0xFF087E78)),
+        styleString = "animated:realistic_magical_garden",
+        iconEmoji = "🌙",
+        isAnimated = true
+    ),
+    TextPostBackgroundTemplate(
+        id = "animated:realistic_3d_panda",
+        label = "3D Panda",
+        category = AnimatedBgCategory.REALISTIC,
+        baseColors = listOf(Color(0xFF064E3B), Color(0xFF022C22), Color(0xFF042F2E)),
+        styleString = "animated:realistic_3d_panda",
+        iconEmoji = "🐼",
+        isAnimated = true
+    ),
+    TextPostBackgroundTemplate(
+        id = "animated:realistic_rose_garden",
+        label = "Rose Garden",
+        category = AnimatedBgCategory.REALISTIC,
+        baseColors = listOf(Color(0xFF2A0614), Color(0xFF4C0519), Color(0xFF881337)),
+        styleString = "animated:realistic_rose_garden",
+        iconEmoji = "🌹",
+        isAnimated = true
+    ),
+    TextPostBackgroundTemplate(
+        id = "animated:realistic_fantasy_forest",
+        label = "Sunlit Forest",
+        category = AnimatedBgCategory.REALISTIC,
+        baseColors = listOf(Color(0xFF052E16), Color(0xFF14532D), Color(0xFF166534)),
+        styleString = "animated:realistic_fantasy_forest",
+        iconEmoji = "🌲",
+        isAnimated = true
+    ),
+    TextPostBackgroundTemplate(
+        id = "animated:realistic_glowing_mushrooms",
+        label = "Glow Mushrooms",
+        category = AnimatedBgCategory.REALISTIC,
+        baseColors = listOf(Color(0xFF042F2E), Color(0xFF134E4A), Color(0xFF0E7490)),
+        styleString = "animated:realistic_glowing_mushrooms",
+        iconEmoji = "🍄",
+        isAnimated = true
+    ),
+    TextPostBackgroundTemplate(
+        id = "animated:realistic_magical_waterfall",
+        label = "Crystal Waterfall",
+        category = AnimatedBgCategory.REALISTIC,
+        baseColors = listOf(Color(0xFF082F49), Color(0xFF0369A1), Color(0xFF0284C7)),
+        styleString = "animated:realistic_magical_waterfall",
+        iconEmoji = "🌊",
+        isAnimated = true
+    ),
+    TextPostBackgroundTemplate(
+        id = "animated:realistic_butterfly_haven",
+        label = "Realistic Butterflies",
+        category = AnimatedBgCategory.REALISTIC,
+        baseColors = listOf(Color(0xFF2E1065), Color(0xFF581C87), Color(0xFF7E22CE)),
+        styleString = "animated:realistic_butterfly_haven",
+        iconEmoji = "🦋",
+        isAnimated = true
+    ),
+    TextPostBackgroundTemplate(
+        id = "animated:realistic_firefly_glade",
+        label = "Firefly Glade",
+        category = AnimatedBgCategory.REALISTIC,
+        baseColors = listOf(Color(0xFF020617), Color(0xFF0F172A), Color(0xFF1E293B)),
+        styleString = "animated:realistic_firefly_glade",
+        iconEmoji = "✨",
+        isAnimated = true
+    ),
+    TextPostBackgroundTemplate(
+        id = "animated:realistic_floating_petals",
+        label = "Cherry Grove",
+        category = AnimatedBgCategory.REALISTIC,
+        baseColors = listOf(Color(0xFF3B0724), Color(0xFF500724), Color(0xFF831843)),
+        styleString = "animated:realistic_floating_petals",
+        iconEmoji = "🌸",
+        isAnimated = true
+    ),
+    TextPostBackgroundTemplate(
+        id = "animated:realistic_luxury_romantic",
+        label = "Luxury Gold & Velvet",
+        category = AnimatedBgCategory.REALISTIC,
+        baseColors = listOf(Color(0xFF1C0A26), Color(0xFF3B0764), Color(0xFF4C0519)),
+        styleString = "animated:realistic_luxury_romantic",
+        iconEmoji = "💎",
+        isAnimated = true
+    ),
+    TextPostBackgroundTemplate(
+        id = "animated:realistic_3d_lion",
+        label = "3D Golden Lion",
+        category = AnimatedBgCategory.REALISTIC,
+        baseColors = listOf(Color(0xFF451A03), Color(0xFF78350F), Color(0xFF92400E)),
+        styleString = "animated:realistic_3d_lion",
+        iconEmoji = "🦁",
         isAnimated = true
     )
 )

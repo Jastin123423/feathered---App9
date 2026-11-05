@@ -19,8 +19,18 @@ object UserSessionManager {
     private const val LS_TOKEN_KEY = "token"
     private const val LS_USER_ID_KEY = "user_id"
 
+    @Volatile
+    private var cachedUser: User? = null
+
+    fun setCurrentUser(user: User?) {
+        cachedUser = user
+    }
+
+    fun getCurrentUser(): User? = cachedUser
+
     fun saveAuth(context: Context, token: String?, user: User) {
         if (user.id <= 0L) return
+        cachedUser = user
         try {
             val json = JSONObject().apply {
                 put("id", user.id)
@@ -114,7 +124,7 @@ object UserSessionManager {
                 ?: obj.optString("birthDate").takeIf { it.isNotBlank() && it != "null" })?.trim()
             val gender = obj.optString("gender", "Female")
 
-            return User(
+            val user = User(
                 id = id,
                 name = name,
                 username = if (username.startsWith("@")) username else "@$username",
@@ -134,6 +144,8 @@ object UserSessionManager {
                 birthDate = birthDate,
                 gender = gender
             )
+            cachedUser = user
+            return user
         } catch (e: Exception) {
             e.printStackTrace()
             return null
@@ -141,6 +153,7 @@ object UserSessionManager {
     }
 
     fun clearUser(context: Context) {
+        cachedUser = null
         try {
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .edit()
