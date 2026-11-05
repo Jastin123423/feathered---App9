@@ -19,6 +19,7 @@ import com.unera.social.data.SongsApiService
 import android.content.Context
 import android.net.Uri
 import com.unera.social.data.MediaUploadHelper
+import com.unera.social.data.CommentsCache
 import com.unera.social.model.*
 import com.unera.social.ui.components.PostUploadState
 import com.unera.social.ui.screens.toPost
@@ -377,9 +378,12 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
             }
             val enrichedPosts = enrichPostsWithAuthors(livePosts, currentUsers).map { p ->
                 val uId = if (p.userId > 0L) p.userId else p.author.id
-                if (myFollowingSet.contains(uId)) {
-                    p.copy(author = p.author.copy(isFollowing = true))
-                } else p
+                val authorWithFollow = if (myFollowingSet.contains(uId)) {
+                    p.author.copy(isFollowing = true)
+                } else p.author
+                val cached = CommentsCache.getCachedComments(CommentsCache.resolveItemType(p), p.id)
+                val finalComments = if (p.comments.isNotEmpty()) p.comments else (cached ?: p.comments)
+                p.copy(author = authorWithFollow, comments = finalComments)
             }
             _uiState.update { state ->
                 val updatedPymk = state.peopleYouMayKnow.map { u ->
@@ -1122,6 +1126,11 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun likeComment(postId: Long, commentId: Long) {
+        CommentsCache.updateCachedComment(commentId) { c ->
+            val newLiked = !c.isLiked
+            val newCount = if (newLiked) c.likesCount + 1 else (c.likesCount - 1).coerceAtLeast(0)
+            c.copy(isLiked = newLiked, likesCount = newCount)
+        }
         val post = _uiState.value.posts.find { it.id == postId }
             ?: _uiState.value.videoPosts.find { it.id == postId }
             ?: _uiState.value.selectedPostForComments
@@ -1177,7 +1186,8 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
         mediaUrls: List<String> = emptyList(),
         location: String? = null,
         backgroundStyle: String? = null,
-        taggedUsers: List<Long> = emptyList()
+        taggedUsers: List<Long> = emptyList(),
+        explicitMediaType: String? = null
     ) {
         if (_uiState.value.isGuest || !_uiState.value.isLoggedIn) {
             openAuth("login")
@@ -1191,24 +1201,19 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
 
         var hasVideos = false
         var hasPhotos = false
-        if (context != null) {
+        if (explicitMediaType == "video") {
+            hasVideos = true
+        } else if (explicitMediaType == "image") {
+            hasPhotos = allMedia.isNotEmpty()
+        } else {
             for (m in allMedia) {
-                if (m.startsWith("content://") || m.startsWith("file://")) {
-                    val mime = try { context.contentResolver.getType(Uri.parse(m)) ?: "" } catch (_: Exception) { "" }
-                    if (mime.startsWith("video") || m.contains(".mp4") || m.contains("video")) {
-                        hasVideos = true
-                    } else {
-                        hasPhotos = true
-                    }
-                } else if (PostsApiService.isValidVideoUrl(m)) {
+                if (isVideoMediaUri(context, m)) {
                     hasVideos = true
                 } else {
                     hasPhotos = true
                 }
             }
-        } else {
-            hasVideos = allMedia.any { PostsApiService.isValidVideoUrl(it) }
-            hasPhotos = allMedia.isNotEmpty() && !hasVideos
+            if (hasVideos) hasPhotos = false
         }
 
         // Preview for the progress banner
@@ -1274,10 +1279,10 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
                                         thumb = thumb,
                                         feed = feed,
                                         full = full,
-                                        original = full,
-                                        thumbnailUrl = thumb,
-                                        resolution720 = feed,
-                                        resolution1080 = full,
+                                        original = null,
+                                        thumbnailUrl = null,
+                                        resolution720 = null,
+                                        resolution1080 = null,
                                         type = "image",
                                         width = bundleResult.width,
                                         height = bundleResult.height
@@ -1291,6 +1296,10 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
                                         thumb = item,
                                         feed = item,
                                         full = item,
+                                        original = null,
+                                        thumbnailUrl = null,
+                                        resolution720 = null,
+                                        resolution1080 = null,
                                         type = "image"
                                     )
                                 )
@@ -1303,6 +1312,10 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
                                     thumb = item,
                                     feed = item,
                                     full = item,
+                                    original = null,
+                                    thumbnailUrl = null,
+                                    resolution720 = null,
+                                    resolution1080 = null,
                                     type = "image"
                                 )
                             )
@@ -1416,12 +1429,27 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
                 } else if (allMedia.isNotEmpty()) {
                     // Already uploaded HTTP URLs
                     finalMediaUrls.addAll(allMedia)
-                    val isVid = allMedia.any { PostsApiService.isValidVideoUrl(it) }
+                    val isVid = if (explicitMediaType == "video") true else if (explicitMediaType == "image") false else allMedia.any { isVideoMediaUri(context, it) }
                     finalMediaType = if (isVid) "video" else "image"
                     finalMediaUrl = allMedia.firstOrNull()
                     if (isVid) primaryVideoUrl = finalMediaUrl
                     finalMediaTypes.addAll(allMedia.map { if (isVid) "video" else "image" })
-                    finalMediaMeta.add(MediaMetaItem(original = finalMediaUrl, type = finalMediaType))
+                    if (isVid) {
+                        finalMediaMeta.add(MediaMetaItem(original = finalMediaUrl, resolution720 = finalMediaUrl, type = "video"))
+                    } else {
+                        finalMediaMeta.add(
+                            MediaMetaItem(
+                                thumb = finalMediaUrl,
+                                feed = finalMediaUrl,
+                                full = finalMediaUrl,
+                                original = null,
+                                thumbnailUrl = null,
+                                resolution720 = null,
+                                resolution1080 = null,
+                                type = "image"
+                            )
+                        )
+                    }
                 }
 
                 // ==========================================
@@ -1514,6 +1542,41 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
                 _uiState.update { it.copy(postUploadState = null) }
             }
         }
+    }
+
+    private fun isVideoMediaUri(context: Context?, uriString: String): Boolean {
+        val u = uriString.trim().lowercase()
+        // 1. Explicit image extensions -> always image!
+        if (u.endsWith(".jpg") || u.endsWith(".jpeg") || u.endsWith(".png") ||
+            u.endsWith(".webp") || u.endsWith(".gif") || u.endsWith(".bmp") ||
+            u.endsWith(".heic") || u.endsWith(".heif") ||
+            u.contains(".jpg?") || u.contains(".jpeg?") || u.contains(".png?") || u.contains(".webp?")
+        ) {
+            return false
+        }
+        // 2. Explicit video extensions -> video!
+        if (u.endsWith(".mp4") || u.endsWith(".webm") || u.endsWith(".mov") ||
+            u.endsWith(".m4v") || u.endsWith(".mkv") || u.endsWith(".3gp") ||
+            u.contains(".mp4?") || u.contains(".webm?") || u.contains(".mov?")
+        ) {
+            return true
+        }
+        // 3. ContentResolver MIME type
+        if (context != null && (u.startsWith("content://") || u.startsWith("file://"))) {
+            val mime = try {
+                context.contentResolver.getType(Uri.parse(uriString))?.lowercase()
+            } catch (_: Exception) { null }
+
+            if (!mime.isNullOrBlank()) {
+                if (mime.startsWith("image/")) return false
+                if (mime.startsWith("video/")) return true
+            }
+        }
+        // 4. Remote HTTP URL
+        if (u.startsWith("http://") || u.startsWith("https://")) {
+            if (u.contains("/videos/") || u.contains("/reels/")) return true
+        }
+        return false
     }
 
     fun dismissPostUpload() {

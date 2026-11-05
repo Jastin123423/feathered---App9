@@ -744,7 +744,7 @@ fun FeatheredApp(
             allUsers = uiState.users,
             initialOpenPicker = uiState.createPostInitialPicker,
             onDismiss = { viewModel.setShowCreatePostDialog(false) },
-            onSubmit = { content, mediaUrl, mediaUrls, feeling, location, background, taggedUsers ->
+            onSubmit = { content, mediaUrl, mediaUrls, feeling, location, background, taggedUsers, mediaType ->
                 viewModel.createPost(
                     context = context,
                     content = content,
@@ -753,7 +753,8 @@ fun FeatheredApp(
                     mediaUrls = mediaUrls,
                     location = location,
                     backgroundStyle = background,
-                    taggedUsers = taggedUsers
+                    taggedUsers = taggedUsers,
+                    explicitMediaType = mediaType
                 )
             },
             onCreateEventClick = {

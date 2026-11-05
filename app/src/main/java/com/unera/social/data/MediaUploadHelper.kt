@@ -88,19 +88,35 @@ object MediaUploadHelper {
         val durationSec: Double?
     ) {
         fun toMediaMetaItem(): MediaMetaItem {
-            return MediaMetaItem(
-                original = originalUrl,
-                resolution1080 = url1080 ?: originalUrl,
-                resolution720 = url720 ?: feedUrl ?: originalUrl,
-                thumbnailUrl = thumbUrl,
-                thumb = thumbUrl,
-                feed = feedUrl ?: url720 ?: originalUrl,
-                full = url1080 ?: originalUrl,
-                type = if (isVideo) "video" else "image",
-                width = width,
-                height = height,
-                duration = durationSec
-            )
+            return if (isVideo) {
+                MediaMetaItem(
+                    original = originalUrl,
+                    resolution1080 = url1080 ?: originalUrl,
+                    resolution720 = url720 ?: feedUrl ?: originalUrl,
+                    thumbnailUrl = thumbUrl,
+                    thumb = thumbUrl,
+                    feed = feedUrl ?: url720 ?: originalUrl,
+                    full = url1080 ?: originalUrl,
+                    type = "video",
+                    width = width,
+                    height = height,
+                    duration = durationSec
+                )
+            } else {
+                MediaMetaItem(
+                    original = null,
+                    resolution1080 = null,
+                    resolution720 = null,
+                    thumbnailUrl = null,
+                    thumb = thumbUrl ?: feedUrl,
+                    feed = feedUrl ?: originalUrl,
+                    full = originalUrl ?: feedUrl,
+                    type = "image",
+                    width = width,
+                    height = height,
+                    duration = null
+                )
+            }
         }
     }
 
@@ -171,7 +187,9 @@ object MediaUploadHelper {
     }
 
     /**
-     * Compresses a bitmap to WebP (or JPEG fallback) with target max dimension.
+     * Compresses a bitmap to JPEG matching the web Imagecompression.ts pipeline:
+     * - Preserves aspect ratio with max dimension constraint
+     * - High fidelity JPEG compression
      */
     fun compressBitmap(source: Bitmap, maxDimension: Int, quality: Int): ByteArray {
         val width = source.width
@@ -188,15 +206,43 @@ object MediaUploadHelper {
         }
 
         val baos = ByteArrayOutputStream()
-        // Try WEBP first, fallback to JPEG if compression returns empty
-        val format = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            Bitmap.CompressFormat.WEBP_LOSSY
-        } else {
-            Bitmap.CompressFormat.WEBP
+        scaled.compress(Bitmap.CompressFormat.JPEG, quality, baos)
+
+        if (scaled != source) {
+            scaled.recycle()
         }
-        val success = scaled.compress(format, quality, baos)
-        if (!success || baos.size() == 0) {
+        return baos.toByteArray()
+    }
+
+    /**
+     * High-performance profile picture compressor matching web Imagecompression.ts:
+     * - Square center-crop or proportional downscale to max 720px
+     * - High quality JPEG 86% (secondary pass 78% if >160KB)
+     */
+    fun compressProfileImage(source: Bitmap): ByteArray {
+        val width = source.width
+        val height = source.height
+        val minSide = minOf(width, height)
+        val sx = maxOf(0, (width - minSide) / 2)
+        val sy = maxOf(0, (height - minSide) / 2)
+        val outDim = minOf(720, minSide)
+
+        val cropped = Bitmap.createBitmap(source, sx, sy, minSide, minSide)
+        val scaled = if (minSide > outDim) {
+            Bitmap.createScaledBitmap(cropped, outDim, outDim, true).also {
+                if (it != cropped) cropped.recycle()
+            }
+        } else {
+            cropped
+        }
+
+        var quality = 86
+        val baos = ByteArrayOutputStream()
+        scaled.compress(Bitmap.CompressFormat.JPEG, quality, baos)
+
+        if (baos.size() > 160 * 1024) {
             baos.reset()
+            quality = 78
             scaled.compress(Bitmap.CompressFormat.JPEG, quality, baos)
         }
 
@@ -207,10 +253,18 @@ object MediaUploadHelper {
     }
 
     /**
-     * Builds and uploads the 3-variant image bundle (thumbnail, feed, original) matching web:
-     * - thumbnail: ~320px WebP, quality 72%
-     * - feed: ~1080px WebP, quality 82%
-     * - original: ~1920px WebP, quality 88%
+     * Cover banner photo compressor matching web Imagecompression.ts:
+     * - Max 1920px, JPEG 88%
+     */
+    fun compressCoverImage(source: Bitmap): ByteArray {
+        return compressBitmap(source, 1920, 88)
+    }
+
+    /**
+     * Builds and uploads the 3-variant image bundle (thumb, feed, full) matching web Imagecompression.ts:
+     * - thumb: ~320px JPEG, quality 72%
+     * - feed: ~1080px JPEG, quality 82%
+     * - full: ~1600px JPEG, quality 86%
      */
     suspend fun buildImageBundleAndUpload(
         context: Context,
@@ -222,7 +276,7 @@ object MediaUploadHelper {
         try {
             val thumbBytes = compressBitmap(bitmap, 320, 72)
             val feedBytes = compressBitmap(bitmap, 1080, 82)
-            val fullBytes = compressBitmap(bitmap, 1920, 88)
+            val fullBytes = compressBitmap(bitmap, 1600, 86)
 
             val boundary = "==FeatheredBundle-${UUID.randomUUID()}=="
             val urlString = "$BASE_URL/api/upload"
@@ -239,22 +293,22 @@ object MediaUploadHelper {
 
             // Part 1: thumbnail
             dos.writeBytes("--$boundary\r\n")
-            dos.writeBytes("Content-Disposition: form-data; name=\"thumbnail\"; filename=\"thumb.webp\"\r\n")
-            dos.writeBytes("Content-Type: image/webp\r\n\r\n")
+            dos.writeBytes("Content-Disposition: form-data; name=\"thumbnail\"; filename=\"thumb.jpg\"\r\n")
+            dos.writeBytes("Content-Type: image/jpeg\r\n\r\n")
             dos.write(thumbBytes)
             dos.writeBytes("\r\n")
 
             // Part 2: feed
             dos.writeBytes("--$boundary\r\n")
-            dos.writeBytes("Content-Disposition: form-data; name=\"feed\"; filename=\"feed.webp\"\r\n")
-            dos.writeBytes("Content-Type: image/webp\r\n\r\n")
+            dos.writeBytes("Content-Disposition: form-data; name=\"feed\"; filename=\"feed.jpg\"\r\n")
+            dos.writeBytes("Content-Type: image/jpeg\r\n\r\n")
             dos.write(feedBytes)
             dos.writeBytes("\r\n")
 
-            // Part 3: original
+            // Part 3: original (full)
             dos.writeBytes("--$boundary\r\n")
-            dos.writeBytes("Content-Disposition: form-data; name=\"original\"; filename=\"full.webp\"\r\n")
-            dos.writeBytes("Content-Type: image/webp\r\n\r\n")
+            dos.writeBytes("Content-Disposition: form-data; name=\"original\"; filename=\"full.jpg\"\r\n")
+            dos.writeBytes("Content-Type: image/jpeg\r\n\r\n")
             dos.write(fullBytes)
             dos.writeBytes("\r\n")
 
@@ -275,20 +329,24 @@ object MediaUploadHelper {
                     val mediaUrls = json.optJSONObject("media_urls")
 
                     val thumbUrl = uploaded?.optJSONObject("thumbnail")?.optString("url")
+                        ?: uploaded?.optJSONObject("thumb")?.optString("url")
                         ?: mediaUrls?.optString("thumb")
+                        ?: mediaUrls?.optString("thumbnail")
                         ?: ""
                     val feedUrl = uploaded?.optJSONObject("feed")?.optString("url")
                         ?: mediaUrls?.optString("feed")
                         ?: json.optString("url")
-                    val originalUrl = uploaded?.optJSONObject("original")?.optString("url")
+                    val fullUrl = uploaded?.optJSONObject("original")?.optString("url")
+                        ?: uploaded?.optJSONObject("full")?.optString("url")
                         ?: mediaUrls?.optString("full")
+                        ?: mediaUrls?.optString("original")
                         ?: feedUrl
 
                     if (feedUrl.isNotBlank()) {
                         return@withContext ImageBundleResult(
                             thumbUrl = thumbUrl.ifBlank { feedUrl },
                             feedUrl = feedUrl,
-                            originalUrl = originalUrl.ifBlank { feedUrl },
+                            originalUrl = fullUrl.ifBlank { feedUrl },
                             width = dims.first.coerceAtLeast(bitmap.width),
                             height = dims.second.coerceAtLeast(bitmap.height)
                         )
@@ -612,8 +670,12 @@ object MediaUploadHelper {
         isVideoHint: Boolean = false,
         onProgress: ((String, Float) -> Unit)? = null
     ): UploadedMediaResult? = withContext(Dispatchers.IO) {
-        val mimeType = try { context.contentResolver.getType(uri) ?: "" } catch (_: Exception) { "" }
-        val isVideo = mimeType.startsWith("video") || isVideoHint
+        val uriStr = uri.toString().lowercase()
+        val isExplicitImage = uriStr.endsWith(".jpg") || uriStr.endsWith(".jpeg") || uriStr.endsWith(".png") ||
+                uriStr.endsWith(".webp") || uriStr.endsWith(".gif") || uriStr.contains(".jpg?") || uriStr.contains(".png?")
+        val mimeType = try { context.contentResolver.getType(uri)?.lowercase() ?: "" } catch (_: Exception) { "" }
+        val isExplicitVideo = uriStr.endsWith(".mp4") || uriStr.endsWith(".mov") || uriStr.endsWith(".webm") || uriStr.endsWith(".mkv")
+        val isVideo = !isExplicitImage && (isExplicitVideo || mimeType.startsWith("video") || (isVideoHint && !mimeType.startsWith("image")))
 
         if (isVideo) {
             val vResult = processAndUploadVideo(context, uri) { status, pct ->
@@ -632,14 +694,14 @@ object MediaUploadHelper {
                 durationSec = vResult.durationSec
             )
         } else {
-            onProgress?.invoke("Optimizing & compressing image (1080p, 720p)...", 30f)
+            onProgress?.invoke("Optimizing & compressing image...", 30f)
             val bundleResult = buildImageBundleAndUpload(context, uri) ?: return@withContext null
             onProgress?.invoke("Image uploaded", 90f)
 
             UploadedMediaResult(
                 originalUrl = bundleResult.originalUrl,
-                url1080 = bundleResult.originalUrl,
-                url720 = bundleResult.feedUrl,
+                url1080 = null,
+                url720 = null,
                 thumbUrl = bundleResult.thumbUrl,
                 feedUrl = bundleResult.feedUrl,
                 isVideo = false,

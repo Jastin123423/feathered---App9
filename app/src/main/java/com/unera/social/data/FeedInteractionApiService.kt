@@ -323,6 +323,9 @@ object FeedInteractionApiService {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+        if (commentsList.isNotEmpty()) {
+            CommentsCache.setCachedComments(CommentsCache.resolveItemType(post), post.id, commentsList)
+        }
         commentsList
     }
 
@@ -467,6 +470,10 @@ data class AddCommentResult(
                         isHidden = parsed?.isHidden ?: false
                     )
 
+                    val itemType = CommentsCache.resolveItemType(post)
+                    val existing = CommentsCache.getCachedComments(itemType, post.id) ?: emptyList()
+                    CommentsCache.setCachedComments(itemType, post.id, listOf(finalComment) + existing.filter { it.id != finalComment.id })
+
                     return@withContext AddCommentResult(
                         comment = finalComment,
                         commentsCount = serverCommentsCount
@@ -524,7 +531,15 @@ data class AddCommentResult(
 
             val code = conn.responseCode
             conn.disconnect()
-            return@withContext code in 200..299
+            val success = code in 200..299
+            if (success) {
+                CommentsCache.updateCachedComment(commentId) { c ->
+                    val newLiked = !c.isLiked
+                    val newCount = if (newLiked) c.likesCount + 1 else (c.likesCount - 1).coerceAtLeast(0)
+                    c.copy(isLiked = newLiked, likesCount = newCount)
+                }
+            }
+            return@withContext success
         } catch (e: Exception) {
             e.printStackTrace()
             return@withContext false
@@ -889,7 +904,8 @@ data class AddCommentResult(
             isLiked = isLiked,
             imageUrl = imageUrl,
             parentCommentId = parentCommentId,
-            isHidden = isHidden
+            isHidden = isHidden,
+            userId = resolvedUserId
         )
     }
 }

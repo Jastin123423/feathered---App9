@@ -28,8 +28,17 @@ object PostsApiService {
     fun isValidVideoUrl(url: String?): Boolean {
         if (!isValidMediaUrl(url)) return false
         val u = url!!.trim().lowercase()
+        // Images must NEVER be classified as videos
+        if (u.endsWith(".jpg") || u.endsWith(".jpeg") || u.endsWith(".png") ||
+            u.endsWith(".webp") || u.endsWith(".gif") || u.endsWith(".bmp") ||
+            u.endsWith(".heic") || u.endsWith(".heif") ||
+            u.contains(".jpg?") || u.contains(".jpeg?") || u.contains(".png?") || u.contains(".webp?")
+        ) {
+            return false
+        }
         return u.endsWith(".mp4") || u.endsWith(".webm") || u.endsWith(".mov") || u.endsWith(".m4v") ||
-                u.endsWith(".mkv") || u.contains("/video/") || u.contains("video_") || u.contains(".mp4?")
+                u.endsWith(".mkv") || u.endsWith(".3gp") || u.contains("/video/") || u.contains("/videos/") ||
+                u.contains(".mp4?") || u.contains(".mov?") || u.contains(".webm?")
     }
 
     fun isImageUrl(url: String?): Boolean {
@@ -235,6 +244,10 @@ object PostsApiService {
                 setRequestProperty("x-user-id", userId.toString())
             }
 
+            val isVideo = (type == "video" || mediaType == "video")
+            val isImage = (type == "image" || mediaType == "image" || (!isVideo && (mediaUrls.isNotEmpty() || !mediaUrl.isNullOrBlank())))
+            val resolvedPostType = if (isVideo) "video" else if (isImage) "image" else (type ?: "text")
+
             val body = JSONObject().apply {
                 put("user_id", userId)
                 put("content", content.trim())
@@ -242,43 +255,71 @@ object PostsApiService {
                 if (mediaUrls.isNotEmpty()) {
                     put("media_urls", JSONArray(mediaUrls))
                 }
-                if (!mediaType.isNullOrBlank()) put("media_type", mediaType)
+
+                if (isImage) {
+                    put("media_type", "image")
+                    put("type", "image")
+                    // Do NOT send video_url, thumbnail_url, or thumb for image posts
+                } else if (isVideo) {
+                    put("media_type", "video")
+                    put("type", "video")
+                    if (!videoUrl.isNullOrBlank()) put("video_url", videoUrl)
+                    val resolvedThumb = thumbnailUrl ?: mediaMeta.firstOrNull()?.thumbnailUrl ?: mediaMeta.firstOrNull()?.thumb
+                    if (!resolvedThumb.isNullOrBlank()) {
+                        put("thumbnail_url", resolvedThumb)
+                        put("thumb_url", resolvedThumb)
+                        put("thumb", resolvedThumb)
+                    }
+                } else {
+                    put("type", resolvedPostType)
+                    if (!mediaType.isNullOrBlank()) put("media_type", mediaType)
+                }
+
                 if (mediaTypes.isNotEmpty()) {
                     put("media_types", JSONArray(mediaTypes))
                 }
-                if (!videoUrl.isNullOrBlank()) put("video_url", videoUrl)
-                val resolvedThumb = thumbnailUrl ?: mediaMeta.firstOrNull()?.thumbnailUrl ?: mediaMeta.firstOrNull()?.thumb
-                if (!resolvedThumb.isNullOrBlank()) {
-                    put("thumbnail_url", resolvedThumb)
-                    put("thumb_url", resolvedThumb)
-                    put("thumb", resolvedThumb)
-                }
+
                 if (mediaMeta.isNotEmpty()) {
                     val metaArray = JSONArray()
                     for (item in mediaMeta) {
-                        val mObj = JSONObject().apply {
-                            if (!item.original.isNullOrBlank()) put("original", item.original)
-                            if (!item.resolution1080.isNullOrBlank()) put("1080", item.resolution1080)
-                            if (!item.resolution720.isNullOrBlank()) put("720", item.resolution720)
-                            val th = item.thumbnailUrl ?: item.thumb
-                            if (!th.isNullOrBlank()) {
-                                put("thumbnail_url", th)
-                                put("thumb", th)
+                        val itemType = if (!item.type.isNullOrBlank()) item.type else (if (isVideo) "video" else "image")
+                        if (itemType == "image" || (isImage && !isVideo)) {
+                            // Exact web outcome: [{"thumb":"...","feed":"...","full":"...","type":"image"}]
+                            val mObj = JSONObject().apply {
+                                val th = item.thumb ?: item.thumbnailUrl ?: item.feed ?: item.full
+                                if (!th.isNullOrBlank()) put("thumb", th)
+                                val fd = item.feed ?: item.full ?: item.thumb
+                                if (!fd.isNullOrBlank()) put("feed", fd)
+                                val fl = item.full ?: item.feed ?: item.thumb
+                                if (!fl.isNullOrBlank()) put("full", fl)
+                                put("type", "image")
+                                if (item.width != null && item.width > 0) put("width", item.width)
+                                if (item.height != null && item.height > 0) put("height", item.height)
                             }
-                            if (!item.feed.isNullOrBlank()) put("feed", item.feed)
-                            if (!item.full.isNullOrBlank()) put("full", item.full)
-                            val itemType = if (!item.type.isNullOrBlank()) item.type else (if (mediaType == "video") "video" else "image")
-                            put("type", itemType)
-                            if (item.width != null) put("width", item.width)
-                            if (item.height != null) put("height", item.height)
-                            if (item.duration != null) put("duration", item.duration)
+                            metaArray.put(mObj)
+                        } else {
+                            // Video format
+                            val mObj = JSONObject().apply {
+                                if (!item.original.isNullOrBlank()) put("original", item.original)
+                                if (!item.resolution1080.isNullOrBlank()) put("1080", item.resolution1080)
+                                if (!item.resolution720.isNullOrBlank()) put("720", item.resolution720)
+                                val th = item.thumbnailUrl ?: item.thumb
+                                if (!th.isNullOrBlank()) {
+                                    put("thumbnail_url", th)
+                                    put("thumb", th)
+                                }
+                                if (!item.feed.isNullOrBlank()) put("feed", item.feed)
+                                if (!item.full.isNullOrBlank()) put("full", item.full)
+                                put("type", "video")
+                                if (item.width != null) put("width", item.width)
+                                if (item.height != null) put("height", item.height)
+                                if (item.duration != null) put("duration", item.duration)
+                            }
+                            metaArray.put(mObj)
                         }
-                        metaArray.put(mObj)
                     }
                     put("media_meta", metaArray)
                 }
-                val postType = type ?: (if (mediaType == "video") "video" else if (mediaType == "image") "image" else "text")
-                put("type", postType)
                 put("feed_key", "post:${System.currentTimeMillis()}")
                 put("visibility", visibility)
                 if (!feeling.isNullOrBlank()) put("feeling", feeling)

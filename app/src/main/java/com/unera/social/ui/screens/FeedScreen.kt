@@ -45,6 +45,7 @@ import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.unera.social.data.MockData
 import com.unera.social.data.PostsApiService
+import com.unera.social.data.CommentsCache
 import com.unera.social.model.*
 import com.unera.social.ui.components.*
 import java.util.Locale
@@ -437,7 +438,9 @@ fun FeedScreen(
                         onHidePost = { onHidePost?.invoke(it) },
                         onReportPost = { id, reason -> onReportPost?.invoke(id, reason) },
                         onPushMore = onPushMore,
-                        pushedPosts = pushedPosts
+                        pushedPosts = pushedPosts,
+                        allUsers = allUsers,
+                        onLikeComment = onLikeComment
                     )
                 }
 
@@ -1057,11 +1060,36 @@ fun WebPostCard(
     onReportPost: ((Long, String) -> Unit)? = null,
     onPushMore: ((Post) -> Unit)? = null,
     pushedPosts: Map<Long, Boolean> = emptyMap(),
+    allUsers: List<User> = emptyList(),
+    onLikeComment: ((Long, Long) -> Unit)? = null,
     hideCommentPreview: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var showReactionDock by remember { mutableStateOf(false) }
     var isExpandedText by remember { mutableStateOf(false) }
+
+    // Observe cache updates so preview comment reflects likes, additions, and network fetches
+    val cacheVersion by CommentsCache.cacheVersion.collectAsState()
+
+    // 1 & 2: Try post.comments[0], else cached comments
+    var previewComment by remember(post.id, post.comments, cacheVersion) {
+        mutableStateOf(CommentsCache.getPreviewCommentSync(post))
+    }
+
+    // 3: If not cached and commentsCount > 0, fetch asynchronously
+    LaunchedEffect(post.id, post.commentsCount) {
+        if (!hideCommentPreview && previewComment == null && post.commentsCount > 0) {
+            val fetched = CommentsCache.ensurePreviewComment(post, currentUser.id)
+            if (fetched != null) {
+                previewComment = fetched
+            }
+        }
+    }
+
+    // 4: Resolve previewAuthor from previewComment.user_id via allUsers (with fallbacks)
+    val previewAuthor = remember(previewComment, allUsers) {
+        previewComment?.let { CommentsCache.resolvePreviewAuthor(it, allUsers) }
+    }
 
     // Media list (single or multiple)
     val mediaList = remember(post.mediaUrl, post.mediaUrls) {
@@ -1668,60 +1696,113 @@ fun WebPostCard(
             }
 
             // Inline Single Comment Preview (Matching Facebook / Web style)
-            if (!hideCommentPreview && post.comments.isNotEmpty()) {
-                val previewComment = post.comments.firstOrNull()
-                if (previewComment != null) {
-                    HorizontalDivider(color = Color(0xFF1E293B).copy(alpha = 0.5f), thickness = 1.dp)
+            if (!hideCommentPreview && previewComment != null && previewAuthor != null) {
+                val currentComment = previewComment!!
+                HorizontalDivider(color = Color(0xFF1E293B).copy(alpha = 0.5f), thickness = 1.dp)
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 10.dp)
-                        .clickable(onClick = onComment),
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.Top
                 ) {
                     FeatheredAvatar(
-                        name = previewComment.author.name,
-                        imageUrl = previewComment.author.profileImageUrl,
-                        username = previewComment.author.username,
+                        name = previewAuthor.name,
+                        imageUrl = previewAuthor.profileImageUrl,
+                        username = previewAuthor.username,
                         size = 38.dp
                     )
 
                     Spacer(modifier = Modifier.width(10.dp))
 
                     Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color(0xFF162137))
-                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = previewComment.author.name,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 19.sp,
-                                color = Color(0xFFF8FAFC)
-                            )
-                            if (previewComment.author.isVerified) {
-                                Spacer(modifier = Modifier.width(5.dp))
-                                VerifiedBadge(size = 16.dp)
+                        // Bubble: click opens comments sheet
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color(0xFF162137))
+                                .clickable(onClick = onComment)
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = previewAuthor.name,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 19.sp,
+                                        color = Color(0xFFF8FAFC)
+                                    )
+                                    if (previewAuthor.isVerified) {
+                                        Spacer(modifier = Modifier.width(5.dp))
+                                        VerifiedBadge(size = 16.dp)
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = currentComment.text,
+                                    fontSize = 20.sp,
+                                    lineHeight = 26.sp,
+                                    color = Color(0xFFCBD5E1),
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
                         }
 
+                        // Sub-actions row: timestamp, Like button with like count, Reply button
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = previewComment.text,
-                            fontSize = 20.sp,
-                            lineHeight = 26.sp,
-                            color = Color(0xFFCBD5E1),
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Row(
+                            modifier = Modifier.padding(start = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            if (currentComment.timestamp.isNotBlank()) {
+                                Text(
+                                    text = currentComment.timestamp,
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF94A3B8)
+                                )
+                            }
+
+                            val isLiked = currentComment.isLiked
+                            val likesCount = currentComment.likesCount
+                            Row(
+                                modifier = Modifier.clickable {
+                                    onLikeComment?.invoke(post.id, currentComment.id)
+                                },
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = if (isLiked) "Liked" else "Like",
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isLiked) FontWeight.Bold else FontWeight.SemiBold,
+                                    color = if (isLiked) Color(0xFF38BDF8) else Color(0xFF94A3B8)
+                                )
+                                if (likesCount > 0) {
+                                    Text(
+                                        text = formatCount(likesCount),
+                                        fontSize = 12.sp,
+                                        color = if (isLiked) Color(0xFF38BDF8) else Color(0xFF94A3B8)
+                                    )
+                                }
+                            }
+
+                            Text(
+                                text = "Reply",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF94A3B8),
+                                modifier = Modifier.clickable(onClick = onComment)
+                            )
+                        }
                     }
                 }
             }
-        }
     }
 }
 }

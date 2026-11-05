@@ -90,7 +90,7 @@ fun CreatePostModal(
     initialMediaUrl: String? = null,
     initialOpenPicker: String? = null,
     onDismiss: () -> Unit,
-    onSubmit: (content: String, mediaUrl: String?, mediaUrls: List<String>, feeling: String?, location: String?, backgroundStyle: String?, taggedUsers: List<Long>) -> Unit,
+    onSubmit: (content: String, mediaUrl: String?, mediaUrls: List<String>, feeling: String?, location: String?, backgroundStyle: String?, taggedUsers: List<Long>, mediaType: String?) -> Unit,
     onCreateEventClick: (() -> Unit)? = null,
     onPhotoClick: (() -> Unit)? = null,
     onVideoClick: (() -> Unit)? = null
@@ -98,6 +98,7 @@ fun CreatePostModal(
     var view by remember { mutableStateOf(CreatePostView.MAIN) }
     var content by remember { mutableStateOf("") }
     var mediaUrls by remember { mutableStateOf(if (!initialMediaUrl.isNullOrBlank()) listOf(initialMediaUrl) else emptyList<String>()) }
+    var isVideoMedia by remember { mutableStateOf(initialOpenPicker == "video") }
     var activeBackground by remember { mutableStateOf<TextPostBackgroundTemplate?>(null) }
     var activeCategory by remember { mutableStateOf(AnimatedBgCategory.REALISTIC) }
     var textAlignment by remember { mutableStateOf(TextAlign.Center) }
@@ -113,6 +114,7 @@ fun CreatePostModal(
         contract = ActivityResultContracts.PickMultipleVisualMedia()
     ) { uris ->
         if (uris.isNotEmpty()) {
+            isVideoMedia = false
             mediaUrls = mediaUrls + uris.map { it.toString() }
             activeBackground = null
         }
@@ -122,6 +124,7 @@ fun CreatePostModal(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
+            isVideoMedia = true
             mediaUrls = mediaUrls + uri.toString()
             activeBackground = null
         }
@@ -477,6 +480,7 @@ fun CreatePostModal(
                                 onClick = {
                                     if (canPost) {
                                         val backgroundStyleValue = buildFinalBackgroundStyle()
+                                        val resolvedType = if (mediaUrls.isNotEmpty()) (if (isVideoMedia) "video" else "image") else null
                                         onSubmit(
                                             content,
                                             mediaUrls.firstOrNull(),
@@ -484,7 +488,8 @@ fun CreatePostModal(
                                             selectedFeeling,
                                             selectedLocation,
                                             backgroundStyleValue,
-                                            taggedUsers.toList()
+                                            taggedUsers.toList(),
+                                            resolvedType
                                         )
                                         onDismiss()
                                     }
@@ -1157,6 +1162,7 @@ fun CreatePostModal(
                             Button(
                                 onClick = {
                                     if (canPost) {
+                                        val resolvedType = if (mediaUrls.isNotEmpty()) (if (isVideoMedia) "video" else "image") else null
                                         onSubmit(
                                             content,
                                             mediaUrls.firstOrNull(),
@@ -1164,7 +1170,8 @@ fun CreatePostModal(
                                             selectedFeeling,
                                             selectedLocation,
                                             buildFinalBackgroundStyle(),
-                                            taggedUsers.toList()
+                                            taggedUsers.toList(),
+                                            resolvedType
                                         )
                                         onDismiss()
                                     }
@@ -1232,7 +1239,7 @@ fun CreatePostDialog(
     CreatePostModal(
         currentUser = currentUser,
         onDismiss = onDismiss,
-        onSubmit = { content, mediaUrl, _, feeling, _, _, _ ->
+        onSubmit = { content, mediaUrl, _, feeling, _, _, _, _ ->
             onSubmit(content, mediaUrl, feeling)
         }
     )
