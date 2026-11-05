@@ -2038,25 +2038,40 @@ fun GroupPostCard(
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.Top
                 ) {
-                    AsyncImage(
-                        model = latestComment.author.profileImageUrl.ifBlank { "https://ui-avatars.com/api/?name=${latestComment.author.name}" },
-                        contentDescription = latestComment.author.name,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape),
-                        contentScale = ContentScale.Crop
+                    FeatheredAvatar(
+                        name = latestComment.author.name,
+                        imageUrl = latestComment.author.profileImageUrl,
+                        username = latestComment.author.username,
+                        size = 38.dp
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(16.dp))
                                 .background(Color(0xFF162137))
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
                         ) {
                             Column {
-                                Text(latestComment.author.name, color = Color(0xFFF8FAFC), fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                Text(latestComment.text, color = Color(0xFFCBD5E1), fontSize = 13.sp)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = latestComment.author.name,
+                                        color = Color(0xFFF8FAFC),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 19.sp
+                                    )
+                                    if (latestComment.author.isVerified) {
+                                        Spacer(modifier = Modifier.width(5.dp))
+                                        VerifiedBadge(size = 16.dp)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = latestComment.text,
+                                    color = Color(0xFFCBD5E1),
+                                    fontSize = 20.sp,
+                                    lineHeight = 26.sp
+                                )
                             }
                         }
                         Spacer(modifier = Modifier.height(2.dp))

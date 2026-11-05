@@ -479,8 +479,8 @@ object UserApiService {
         val username = if (rawUsername.isNotBlank() && rawUsername != "null") rawUsername else "user$id"
         val displayName = if (rawName.isNotBlank() && rawName != "null") rawName else username
 
-        val avatar = obj.optString("profile_image_url").trim().takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
-            ?: obj.optString("avatar").trim().takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
+        val avatar = obj.optString("profile_image_url").trim().takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("avatar").trim().takeIf { it.isNotBlank() && it != "null" }
             ?: ""
 
         val isVerified = obj.optBoolean("is_verified", false) || obj.optInt("is_verified", 0) == 1
@@ -507,8 +507,8 @@ object UserApiService {
         val username = if (rawUsername.isNotBlank() && rawUsername != "null") rawUsername else "user$id"
         val displayName = if (rawName.isNotBlank() && rawName != "null") rawName else username
 
-        val avatar = obj.optString("profile_image_url").trim().takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
-            ?: obj.optString("avatar").trim().takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
+        val avatar = obj.optString("profile_image_url").trim().takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("avatar").trim().takeIf { it.isNotBlank() && it != "null" }
             ?: ""
 
         val cover = obj.optString("cover_image_url").trim().takeIf { it.isNotBlank() && it != "null" }

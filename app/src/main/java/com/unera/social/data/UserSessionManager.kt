@@ -119,7 +119,7 @@ object UserSessionManager {
                 name = name,
                 username = if (username.startsWith("@")) username else "@$username",
                 email = email,
-                profileImageUrl = if (avatar.contains("photo-1535713875002")) "" else avatar,
+                profileImageUrl = avatar,
                 coverImageUrl = cover.ifBlank { "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1200" },
                 bio = bio,
                 location = location,

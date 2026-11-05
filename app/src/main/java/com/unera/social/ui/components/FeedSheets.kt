@@ -396,24 +396,39 @@ fun ReactionsSheetDialog(
                     } else {
                         items(filteredReactions, key = { it.userId }) { reaction ->
                             val reactorUser = allUsers.find { it.id == reaction.userId }
-                                ?: User(reaction.userId, reaction.userName, "", reaction.userAvatar)
+                            val resolvedName = when {
+                                reaction.userName.isNotBlank() && !reaction.userName.equals("User", ignoreCase = true) && !reaction.userName.startsWith("User ", ignoreCase = true) -> reaction.userName
+                                reactorUser != null && reactorUser.name.isNotBlank() && !reactorUser.name.equals("User", ignoreCase = true) && !reactorUser.name.startsWith("User ", ignoreCase = true) -> reactorUser.name
+                                reaction.username.isNotBlank() -> reaction.username.removePrefix("@")
+                                reactorUser?.username?.isNotBlank() == true -> reactorUser.username.removePrefix("@")
+                                reaction.userName.isNotBlank() -> reaction.userName
+                                else -> reactorUser?.name?.takeIf { it.isNotBlank() } ?: "Member"
+                            }
+                            val resolvedAvatar = reaction.userAvatar.ifBlank { reactorUser?.profileImageUrl ?: "" }
+                            val resolvedUsername = reaction.username.ifBlank { reactorUser?.username ?: "" }
+                            val isVerified = reaction.isVerified || (reactorUser?.isVerified == true)
+                            val finalUser = reactorUser ?: User(
+                                id = reaction.userId,
+                                name = resolvedName,
+                                username = resolvedUsername,
+                                profileImageUrl = resolvedAvatar,
+                                isVerified = isVerified
+                            )
 
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
-                                    .clickable { onUserClick(reactorUser) }
+                                    .clickable { onUserClick(finalUser) }
                                     .padding(10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box {
-                                    AsyncImage(
-                                        model = reaction.userAvatar.ifBlank { reactorUser.profileImageUrl },
-                                        contentDescription = reaction.userName,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .size(46.dp)
-                                            .clip(CircleShape)
+                                    FeatheredAvatar(
+                                        name = resolvedName,
+                                        imageUrl = resolvedAvatar,
+                                        username = resolvedUsername,
+                                        size = 46.dp
                                     )
                                     // Mini reaction emoji badge
                                     Box(
@@ -432,15 +447,21 @@ fun ReactionsSheetDialog(
                                 Spacer(modifier = Modifier.width(12.dp))
 
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = reaction.userName.ifBlank { reactorUser.name },
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 16.sp,
-                                        color = Color(0xFFF8FAFC)
-                                    )
-                                    if (reactorUser.username.isNotBlank()) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(
-                                            text = "@${reactorUser.username}",
+                                            text = resolvedName,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp,
+                                            color = Color(0xFFF8FAFC)
+                                        )
+                                        if (isVerified) {
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            VerifiedBadge(size = 14.dp)
+                                        }
+                                    }
+                                    if (resolvedUsername.isNotBlank()) {
+                                        Text(
+                                            text = if (resolvedUsername.startsWith("@")) resolvedUsername else "@$resolvedUsername",
                                             fontSize = 13.sp,
                                             color = Color(0xFF94A3B8)
                                         )
@@ -1247,12 +1268,12 @@ private fun CommentItemRow(
                             Text(
                                 text = comment.author.name,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp,
+                                fontSize = 19.sp,
                                 color = Color(0xFFF8FAFC)
                             )
                             if (comment.author.isVerified) {
-                                Spacer(modifier = Modifier.width(4.dp))
-                                VerifiedBadge(size = 13.dp)
+                                Spacer(modifier = Modifier.width(5.dp))
+                                VerifiedBadge(size = 16.dp)
                             }
                             if (comment.isHidden) {
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -1282,12 +1303,12 @@ private fun CommentItemRow(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(3.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = comment.text,
-                        fontSize = 13.sp,
+                        fontSize = 20.sp,
                         color = Color(0xFFCBD5E1),
-                        lineHeight = 18.sp
+                        lineHeight = 26.sp
                     )
                 }
             }

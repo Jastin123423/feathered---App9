@@ -153,6 +153,26 @@ fun CreatePostModal(
         regex.find(content)?.value
     }
 
+    val buildFinalBackgroundStyle: () -> String? = {
+        val alignStr = when (textAlignment) {
+            TextAlign.Start -> "left"
+            TextAlign.End -> "right"
+            else -> "center"
+        }
+        val colorHex = String.format("#%06X", (0xFFFFFF and textTextColor.toArgb()))
+        val bg = activeBackground
+        val baseStyle = if (bg != null && bg.id != "none") bg.styleString else ""
+        val hasCustomTextStyling = textAlignment != TextAlign.Center || textTextColor != Color.White || textFontStyle != "normal"
+
+        if (baseStyle.isNotBlank()) {
+            "$baseStyle|align:$alignStr|color:$colorHex|font:$textFontStyle"
+        } else if (hasCustomTextStyling) {
+            "style:none|align:$alignStr|color:$colorHex|font:$textFontStyle"
+        } else {
+            null
+        }
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -184,7 +204,7 @@ fun CreatePostModal(
                             }
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Tag People",
+                                text = "Post with",
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFFF8FAFC),
@@ -456,23 +476,7 @@ fun CreatePostModal(
                             Button(
                                 onClick = {
                                     if (canPost) {
-                                        val backgroundStyleValue = activeBackground?.let { bg ->
-                                            if (bg.id == "none") ""
-                                            else {
-                                                val alignStr = when (textAlignment) {
-                                                    TextAlign.Start -> "left"
-                                                    TextAlign.End -> "right"
-                                                    else -> "center"
-                                                }
-                                                val colorHex = String.format("#%06X", (0xFFFFFF and textTextColor.toArgb()))
-                                                if (bg.isAnimated) {
-                                                    "${bg.styleString}|align:$alignStr|color:$colorHex|font:$textFontStyle"
-                                                } else {
-                                                    bg.styleString
-                                                }
-                                            }
-                                        }?.takeIf { it.isNotBlank() }
-
+                                        val backgroundStyleValue = buildFinalBackgroundStyle()
                                         onSubmit(
                                             content,
                                             mediaUrls.firstOrNull(),
@@ -531,7 +535,7 @@ fun CreatePostModal(
                                             Text(
                                                 text = currentUser.name,
                                                 fontWeight = FontWeight.Bold,
-                                                fontSize = 16.sp,
+                                                fontSize = 19.sp,
                                                 color = Color(0xFFF8FAFC)
                                             )
                                             if (selectedFeeling != null) {
@@ -590,13 +594,17 @@ fun CreatePostModal(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .heightIn(min = 280.dp)
-                                            .padding(horizontal = 14.dp, vertical = 6.dp)
-                                            .clip(RoundedCornerShape(16.dp))
+                                            .padding(horizontal = 0.dp, vertical = 6.dp)
+                                            .clip(RoundedCornerShape(0.dp))
                                             .then(
                                                 if (currentBg.isAnimated) Modifier
                                                 else Modifier.background(Brush.linearGradient(currentBg.baseColors))
                                             ),
-                                        contentAlignment = Alignment.Center
+                                        contentAlignment = when (textAlignment) {
+                                            TextAlign.Start -> Alignment.CenterStart
+                                            TextAlign.End -> Alignment.CenterEnd
+                                            else -> Alignment.Center
+                                        }
                                     ) {
                                         if (currentBg.isAnimated) {
                                             AnimatedPostBackground(
@@ -1101,11 +1109,11 @@ fun CreatePostModal(
                                         }
                                     )
 
-                                    // 3. Tag people
+                                    // 3. Post with
                                     CreatePostOptionRow(
                                         icon = Icons.Default.PersonAdd,
                                         iconTint = Color(0xFF1877F2),
-                                        label = "Tag people",
+                                        label = "Post with",
                                         onClick = { view = CreatePostView.TAG }
                                     )
 
@@ -1155,7 +1163,7 @@ fun CreatePostModal(
                                             mediaUrls,
                                             selectedFeeling,
                                             selectedLocation,
-                                            activeBackground?.styleString?.takeIf { it.isNotBlank() },
+                                            buildFinalBackgroundStyle(),
                                             taggedUsers.toList()
                                         )
                                         onDismiss()

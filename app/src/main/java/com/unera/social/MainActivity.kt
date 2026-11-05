@@ -337,7 +337,11 @@ fun FeatheredApp(
                                 artist = song.artist,
                                 url = song.audioUrl,
                                 cover = song.cover,
-                                duration = song.durationSeconds
+                                duration = song.durationSeconds,
+                                uploaderId = song.uploaderId,
+                                type = "music",
+                                isVerified = song.isVerified,
+                                likesCount = song.stats.likes
                             )
                             viewModel.playTrack(track)
                         },

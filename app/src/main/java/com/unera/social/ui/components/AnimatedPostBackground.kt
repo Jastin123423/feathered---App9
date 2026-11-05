@@ -1261,13 +1261,22 @@ fun TextPostBackgroundView(
         cleanStyle.contains("animated:") || findBackgroundTemplate(cleanStyle)?.isAnimated == true
     }
 
+    // Determine Box alignment from parsed styling.alignment
+    val boxAlignment = remember(styling.alignment) {
+        when (styling.alignment) {
+            TextAlign.Start, TextAlign.Left -> Alignment.CenterStart
+            TextAlign.End, TextAlign.Right -> Alignment.CenterEnd
+            else -> Alignment.Center
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 320.dp)
             .clipToBounds()
             .then(if (onTextClick != null) Modifier.clickable { onTextClick() } else Modifier),
-        contentAlignment = Alignment.Center
+        contentAlignment = boxAlignment
     ) {
         if (isAnimated) {
             // Render High-Fidelity Animated Background Scene
@@ -1276,7 +1285,7 @@ fun TextPostBackgroundView(
                 modifier = Modifier.matchParentSize(),
                 isVisible = isVisible
             )
-        } else {
+        } else if (!cleanStyle.startsWith("style:none") && !cleanStyle.startsWith("none")) {
             // Render Classic Linear Gradient (Preserves 100% existing posts)
             val gradientColors = remember(cleanStyle) {
                 when {
@@ -1306,26 +1315,40 @@ fun TextPostBackgroundView(
                 )
         )
 
-        // Content box that drives minimum 320dp height while allowing text to expand if long
+        // Content box that drives minimum 320dp height while strictly respecting parsed alignment
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .defaultMinSize(minHeight = 320.dp)
                 .padding(horizontal = 26.dp, vertical = 24.dp),
-            contentAlignment = Alignment.Center
+            contentAlignment = boxAlignment
         ) {
             Text(
                 text = content,
                 color = styling.textColor,
                 fontSize = styling.fontSizeSp.sp,
-                fontWeight = when (styling.fontStyleName) {
+                fontWeight = when (styling.fontStyleName.lowercase()) {
+                    "normal", "regular" -> FontWeight.Normal
+                    "medium" -> FontWeight.Medium
+                    "semibold" -> FontWeight.SemiBold
+                    "bold" -> FontWeight.Bold
+                    "extrabold" -> FontWeight.ExtraBold
+                    "black", "display" -> FontWeight.Black
                     "serif" -> FontWeight.SemiBold
-                    "display" -> FontWeight.Black
-                    else -> FontWeight.ExtraBold
+                    "italic" -> FontWeight.Normal
+                    else -> FontWeight.Bold
                 },
-                fontFamily = when (styling.fontStyleName) {
+                fontFamily = when (styling.fontStyleName.lowercase()) {
                     "serif" -> FontFamily.Serif
+                    "monospace", "mono" -> FontFamily.Monospace
+                    "sans-serif", "sans" -> FontFamily.SansSerif
+                    "cursive" -> FontFamily.Cursive
                     else -> FontFamily.Default
+                },
+                fontStyle = if (styling.fontStyleName.equals("italic", ignoreCase = true)) {
+                    androidx.compose.ui.text.font.FontStyle.Italic
+                } else {
+                    androidx.compose.ui.text.font.FontStyle.Normal
                 },
                 textAlign = styling.alignment,
                 lineHeight = (styling.fontSizeSp * 1.45f).sp,

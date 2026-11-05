@@ -1680,13 +1680,11 @@ fun WebPostCard(
                         .clickable(onClick = onComment),
                     verticalAlignment = Alignment.Top
                 ) {
-                    AsyncImage(
-                        model = previewComment.author.profileImageUrl,
-                        contentDescription = previewComment.author.name,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
+                    FeatheredAvatar(
+                        name = previewComment.author.name,
+                        imageUrl = previewComment.author.profileImageUrl,
+                        username = previewComment.author.username,
+                        size = 38.dp
                     )
 
                     Spacer(modifier = Modifier.width(10.dp))
@@ -1696,26 +1694,28 @@ fun WebPostCard(
                             .weight(1f)
                             .clip(RoundedCornerShape(16.dp))
                             .background(Color(0xFF162137))
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = previewComment.author.name,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
+                                fontSize = 19.sp,
                                 color = Color(0xFFF8FAFC)
                             )
                             if (previewComment.author.isVerified) {
-                                Spacer(modifier = Modifier.width(4.dp))
-                                VerifiedBadge(size = 12.dp)
+                                Spacer(modifier = Modifier.width(5.dp))
+                                VerifiedBadge(size = 16.dp)
                             }
                         }
 
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = previewComment.text,
-                            fontSize = 13.sp,
+                            fontSize = 20.sp,
+                            lineHeight = 26.sp,
                             color = Color(0xFFCBD5E1),
-                            maxLines = 2,
+                            maxLines = 3,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
@@ -2263,23 +2263,23 @@ fun MusicPostCard(
     onPlay: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(0.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF0B1120)),
-        border = BorderStroke(1.dp, Color(0xFF1E293B)),
+        border = null,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 6.dp)
+            .padding(horizontal = 0.dp, vertical = 4.dp)
     ) {
-        Column {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
+                    .height(260.dp)
                     .clickable(onClick = onPlay),
                 contentAlignment = Alignment.Center
             ) {
                 AsyncImage(
-                    model = song.cover,
+                    model = song.cover.ifBlank { "https://media.featheredsocial.site/task_01kftb3024ed7bm84gy6j485fh_1769336848_img_0.webp" },
                     contentDescription = song.title,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
@@ -2288,16 +2288,16 @@ fun MusicPostCard(
                 // Large play button overlay
                 Box(
                     modifier = Modifier
-                        .size(56.dp)
+                        .size(58.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF1877F2).copy(alpha = 0.9f)),
+                        .background(Color(0xFF1877F2).copy(alpha = 0.92f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = "Play",
                         tint = Color.White,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(34.dp)
                     )
                 }
             }
@@ -2305,19 +2305,35 @@ fun MusicPostCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(14.dp),
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(song.title, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFFF8FAFC))
-                    Text("${song.artist} • ${song.album}", fontSize = 13.sp, color = Color(0xFF94A3B8))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = song.title,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = Color(0xFFF8FAFC),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "${song.artist} • ${song.album}",
+                        fontSize = 13.sp,
+                        color = Color(0xFF94A3B8),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
+
+                Spacer(modifier = Modifier.width(12.dp))
 
                 Button(
                     onClick = onPlay,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2))
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
@@ -3144,7 +3160,20 @@ fun SharedPostNestedCard(
                     }
                 }
 
-                if (sharedPost.content.isNotBlank()) {
+                val hasSharedBackground = !sharedPost.backgroundStyle.isNullOrBlank() &&
+                    !sharedPost.backgroundStyle.equals("none", ignoreCase = true) &&
+                    !sharedPost.backgroundStyle.equals("null", ignoreCase = true)
+
+                if (hasSharedBackground && sharedPost.content.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextPostBackgroundView(
+                        backgroundStyle = sharedPost.backgroundStyle,
+                        content = sharedPost.content,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+                } else if (sharedPost.content.isNotBlank()) {
                     val words = remember(sharedPost.content) {
                         sharedPost.content.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
                     }

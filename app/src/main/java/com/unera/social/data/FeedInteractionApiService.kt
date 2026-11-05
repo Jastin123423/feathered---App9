@@ -232,11 +232,7 @@ object FeedInteractionApiService {
                     if (arr != null) {
                         for (i in 0 until arr.length()) {
                             val obj = arr.optJSONObject(i) ?: continue
-                            val uid = obj.optLong("user_id", obj.optLong("id", 0L))
-                            val uName = obj.optString("user_name", obj.optString("name", "User"))
-                            val uAvatar = obj.optString("user_avatar", obj.optString("profile_image_url", ""))
-                            val type = obj.optString("type", obj.optString("reaction", "like"))
-                            reactionsList.add(com.unera.social.model.UserReaction(userId = uid, userName = uName, userAvatar = uAvatar, type = type))
+                            reactionsList.add(parseUserReaction(obj))
                         }
                     }
                 } else if (responseText.startsWith("[")) {
@@ -244,11 +240,7 @@ object FeedInteractionApiService {
                     count = arr.length()
                     for (i in 0 until arr.length()) {
                         val obj = arr.optJSONObject(i) ?: continue
-                        val uid = obj.optLong("user_id", obj.optLong("id", 0L))
-                        val uName = obj.optString("user_name", obj.optString("name", "User"))
-                        val uAvatar = obj.optString("user_avatar", obj.optString("profile_image_url", ""))
-                        val type = obj.optString("type", obj.optString("reaction", "like"))
-                        reactionsList.add(com.unera.social.model.UserReaction(userId = uid, userName = uName, userAvatar = uAvatar, type = type))
+                        reactionsList.add(parseUserReaction(obj))
                     }
                 }
             }
@@ -719,6 +711,55 @@ object FeedInteractionApiService {
     // Helpers
     // =========================================================================
 
+    private fun parseUserReaction(obj: JSONObject): com.unera.social.model.UserReaction {
+        val userObj = obj.optJSONObject("user") ?: obj.optJSONObject("author")
+        val uid = obj.optLong("user_id", obj.optLong("id", userObj?.optLong("id", 0L) ?: 0L))
+
+        val rawName = (userObj?.optString("name") ?: "").takeIf { it.isNotBlank() && it != "null" }
+            ?: (userObj?.optString("display_name") ?: "").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("user_name", "").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("name", "").takeIf { it.isNotBlank() && it != "null" }
+            ?: (userObj?.optString("username") ?: "").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("username", "")
+
+        val rawUsername = (userObj?.optString("username") ?: "").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("username", "").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("user_username", "").takeIf { it.isNotBlank() && it != "null" }
+            ?: ""
+
+        val rawAvatar = (userObj?.optString("profile_image_url") ?: "").takeIf { it.isNotBlank() && it != "null" }
+            ?: (userObj?.optString("avatar_url") ?: "").takeIf { it.isNotBlank() && it != "null" }
+            ?: (userObj?.optString("avatar") ?: "").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("user_avatar", "").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("profile_image_url", "").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("avatar", "").takeIf { it.isNotBlank() && it != "null" }
+            ?: ""
+
+        val type = obj.optString("type", obj.optString("reaction", "like"))
+
+        val isVerified = (userObj?.optBoolean("is_verified") ?: obj.optBoolean("is_verified", false)) ||
+            (userObj?.optInt("is_verified", 0) == 1) ||
+            (obj.optInt("is_verified", 0) == 1) ||
+            (userObj?.optBoolean("isVerified") ?: obj.optBoolean("isVerified", false)) ||
+            (userObj?.optBoolean("verified") ?: obj.optBoolean("verified", false))
+
+        val resolvedName = when {
+            rawName.isNotBlank() && !rawName.equals("User", ignoreCase = true) && !rawName.startsWith("User ", ignoreCase = true) -> rawName
+            rawUsername.isNotBlank() -> rawUsername.removePrefix("@")
+            rawName.isNotBlank() -> rawName
+            else -> "Member"
+        }
+
+        return com.unera.social.model.UserReaction(
+            userId = uid,
+            userName = resolvedName,
+            userAvatar = rawAvatar,
+            type = type,
+            username = rawUsername,
+            isVerified = isVerified
+        )
+    }
+
     private fun parseComment(obj: JSONObject, viewerId: Long): Comment? {
         val id = obj.optLong("id", obj.optLong("comment_id", System.currentTimeMillis()))
         val text = obj.optString("text").takeIf { it != "null" }
@@ -738,13 +779,20 @@ object FeedInteractionApiService {
             ?: obj.optString("username").takeIf { it.isNotBlank() && it != "null" }
             ?: if (authorName.isNotBlank()) "@${authorName.lowercase().replace(" ", "")}" else ""
 
-        val avatar = userObj?.optString("profile_image_url")?.takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
-            ?: userObj?.optString("avatar_url")?.takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
-            ?: obj.optString("author_avatar").takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
-            ?: obj.optString("profile_image_url").takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
+        val avatar = userObj?.optString("profile_image_url")?.takeIf { it.isNotBlank() && it != "null" }
+            ?: userObj?.optString("avatar_url")?.takeIf { it.isNotBlank() && it != "null" }
+            ?: userObj?.optString("avatar")?.takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("author_avatar").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("profile_image_url").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("avatar").takeIf { it.isNotBlank() && it != "null" }
             ?: ""
 
-        val isVerified = userObj?.optBoolean("is_verified", false) ?: false
+        val isVerified = (userObj?.optBoolean("is_verified") ?: obj.optBoolean("is_verified", false)) ||
+            (userObj?.optInt("is_verified", 0) == 1) ||
+            (obj.optInt("is_verified", 0) == 1) ||
+            (userObj?.optBoolean("isVerified") ?: obj.optBoolean("isVerified", false)) ||
+            (userObj?.optBoolean("verified") ?: obj.optBoolean("verified", false))
+
         val author = User(
             id = userId,
             name = authorName.ifBlank { username.removePrefix("@") },

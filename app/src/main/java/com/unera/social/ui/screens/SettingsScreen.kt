@@ -1,5 +1,6 @@
 package com.unera.social.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -8,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import com.unera.social.ui.components.FeatheredAvatar
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -234,6 +236,8 @@ fun SettingsScreen(
         return
     }
 
+    BackHandler { onClose() }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -244,361 +248,286 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
-            // Hero Banner: matching web bg-gradient-to-r from-[#0B1120] via-[#0F172A] to-[#0B1120] py-12 px-4 border-b border-[#1E293B]
-            item(key = "hero_banner") {
-                Box(
+            // Flat Top Bar (Facebook style)
+            item(key = "top_bar") {
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(WebCardDark, WebInputDark, WebCardDark)
-                            )
+                        .statusBarsPadding()
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = onClose,
+                        modifier = Modifier.testTag("settings_back_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = WebTextPrimary,
+                            modifier = Modifier.size(24.dp)
                         )
-                        .border(BorderStroke(1.dp, WebBorderDark))
-                        .padding(horizontal = 16.dp, vertical = 28.dp)
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Text(
+                        text = "Settings & privacy",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = WebTextPrimary
+                    )
+                }
+            }
+
+            // Flat Profile Header Row (Facebook Style)
+            item(key = "profile_header") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showEditProfileModal = true }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FeatheredAvatar(
+                        name = currentUser.name,
+                        imageUrl = currentUser.profileImageUrl,
+                        username = currentUser.username,
+                        size = 56.dp
+                    )
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = currentUser.name,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = WebTextPrimary
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Personal details, password, and preferences",
+                            fontSize = 13.sp,
+                            color = WebTextSecondary
+                        )
+                    }
+
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "Edit Profile",
+                        tint = WebTextSecondary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                HorizontalDivider(color = WebBorderDark.copy(alpha = 0.6f), thickness = 8.dp)
+            }
+
+            // Section 1: Account Center (Flat Facebook style)
+            item(key = "account_center_header") {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                ) {
+                    Text(
+                        text = "Account Center",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = WebTextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Manage your password and account security",
+                        fontSize = 13.sp,
+                        color = WebTextSecondary
+                    )
+                }
+            }
+
+            items(ACCOUNT_CENTER_SECTIONS.size) { index ->
+                val section = ACCOUNT_CENTER_SECTIONS[index]
+                SettingsItemRow(
+                    item = section,
+                    onClick = {
+                        when (section.id) {
+                            "password" -> showChangePasswordModal = true
+                            "email" -> showEmailModal = true
+                            "two-factor" -> showTwoFactorModal = true
+                        }
+                    }
+                )
+                if (index < ACCOUNT_CENTER_SECTIONS.size - 1) {
+                    HorizontalDivider(
+                        color = WebBorderDark.copy(alpha = 0.5f),
+                        thickness = 1.dp,
+                        modifier = Modifier.padding(start = 72.dp)
+                    )
+                }
+            }
+
+            item(key = "divider_account") {
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(color = WebBorderDark.copy(alpha = 0.6f), thickness = 8.dp)
+            }
+
+            // Section 2: Profile Details (Flat Facebook style)
+            item(key = "profile_details_header") {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                ) {
+                    Text(
+                        text = "Profile Details",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = WebTextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Edit your name, bio, work, education, and details",
+                        fontSize = 13.sp,
+                        color = WebTextSecondary
+                    )
+                }
+            }
+
+            item(key = "quick_edit_profile") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showEditProfileModal = true }
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                        .testTag("settings_quick_edit_all_btn"),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 800.dp)
-                            .align(Alignment.Center)
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(WebGreen.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            IconButton(
-                                onClick = onClose,
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(WebBorderDark)
-                                    .testTag("settings_back_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back",
-                                    tint = WebTextPrimary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(16.dp))
-
-                            AsyncImage(
-                                model = currentUser.profileImageUrl,
-                                contentDescription = currentUser.name,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .size(64.dp)
-                                    .clip(CircleShape)
-                                    .border(2.dp, WebBorderDark, CircleShape)
-                            )
-
-                            Spacer(modifier = Modifier.width(16.dp))
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Settings & Privacy",
-                                    fontSize = 22.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = WebTextPrimary
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = "Manage your account settings and profile information",
-                                    fontSize = 13.sp,
-                                    color = WebTextSecondary
-                                )
-                            }
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = null,
+                            tint = WebGreen,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Edit All Profile Details",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 16.sp,
+                            color = WebTextPrimary
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Update your full profile information in one place",
+                            fontSize = 13.sp,
+                            color = WebTextSecondary
+                        )
+                    }
+
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = WebPrimaryBlue,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
-                Spacer(modifier = Modifier.height(20.dp))
+                HorizontalDivider(
+                    color = WebBorderDark.copy(alpha = 0.5f),
+                    thickness = 1.dp,
+                    modifier = Modifier.padding(start = 72.dp)
+                )
             }
 
-            // Main Content Area: max-w-[800px] mx-auto px-4 space-y-6
-            // Section 1: Account Center
-            item(key = "account_center") {
+            items(PROFILE_DETAILS_SECTIONS.size) { index ->
+                val section = PROFILE_DETAILS_SECTIONS[index]
+                SettingsItemRow(
+                    item = section,
+                    onClick = { showEditProfileModal = true }
+                )
+                if (index < PROFILE_DETAILS_SECTIONS.size - 1) {
+                    HorizontalDivider(
+                        color = WebBorderDark.copy(alpha = 0.5f),
+                        thickness = 1.dp,
+                        modifier = Modifier.padding(start = 72.dp)
+                    )
+                }
+            }
+
+            item(key = "divider_profile") {
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(color = WebBorderDark.copy(alpha = 0.6f), thickness = 8.dp)
+            }
+
+            // Section 3: More Settings (Flat Facebook style)
+            item(key = "more_settings_header") {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .widthIn(max = 800.dp)
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(bottom = 14.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(WebPrimaryBlue.copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Security,
-                                contentDescription = null,
-                                tint = WebPrimaryBlue,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = "Account Center",
-                                fontSize = 19.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = WebTextPrimary
-                            )
-                            Text(
-                                text = "Manage your password and account security",
-                                fontSize = 13.sp,
-                                color = WebTextSecondary
-                            )
-                        }
-                    }
-
-                    Card(
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = WebCardDark),
-                        border = BorderStroke(1.dp, WebBorderDark),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column {
-                            ACCOUNT_CENTER_SECTIONS.forEachIndexed { index, section ->
-                                SettingsItemRow(
-                                    item = section,
-                                    onClick = {
-                                        when (section.id) {
-                                            "password" -> showChangePasswordModal = true
-                                            "email" -> showEmailModal = true
-                                            "two-factor" -> showTwoFactorModal = true
-                                        }
-                                    }
-                                )
-                                if (index < ACCOUNT_CENTER_SECTIONS.size - 1) {
-                                    HorizontalDivider(color = WebBorderDark, thickness = 1.dp)
-                                }
-                            }
-                        }
-                    }
+                    Text(
+                        text = "More Settings",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = WebTextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Privacy, notifications, and account management",
+                        fontSize = 13.sp,
+                        color = WebTextSecondary
+                    )
                 }
-                Spacer(modifier = Modifier.height(24.dp))
             }
 
-            // Section 2: Profile Details
-            item(key = "profile_details") {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .widthIn(max = 800.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(bottom = 14.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(WebGreen.copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = null,
-                                tint = WebGreen,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = "Profile Details",
-                                fontSize = 19.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = WebTextPrimary
-                            )
-                            Text(
-                                text = "Edit your name, bio, work, education, and more",
-                                fontSize = 13.sp,
-                                color = WebTextSecondary
-                            )
+            items(OTHER_SECTIONS.size) { index ->
+                val section = OTHER_SECTIONS[index]
+                SettingsItemRow(
+                    item = section,
+                    onClick = {
+                        when (section.id) {
+                            "privacy-settings" -> showPrivacyModal = true
+                            "notifications" -> showNotificationsModal = true
+                            "blocked" -> showBlockedModal = true
+                            "help-support" -> onOpenHelpSupport?.invoke()
+                            "terms-of-service" -> onOpenTerms?.invoke()
+                            "delete-account" -> showDeleteAccountModal = true
                         }
                     }
-
-                    Card(
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = WebCardDark),
-                        border = BorderStroke(1.dp, WebBorderDark),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column {
-                            // Quick Edit All Profile Details Button: matching web gradient banner
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            listOf(WebPrimaryBlue.copy(alpha = 0.12f), WebGreen.copy(alpha = 0.12f))
-                                        )
-                                    )
-                                    .clickable { showEditProfileModal = true }
-                                    .padding(16.dp)
-                                    .testTag("settings_quick_edit_all_btn"),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            Brush.linearGradient(listOf(WebPrimaryBlue, WebGreen))
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Edit,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.width(16.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Edit All Profile Details",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 16.sp,
-                                        color = WebTextPrimary
-                                    )
-                                    Text(
-                                        text = "Update your full profile information in one place",
-                                        fontSize = 13.sp,
-                                        color = WebTextSecondary
-                                    )
-                                }
-
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                    contentDescription = null,
-                                    tint = WebPrimaryBlue,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-
-                            HorizontalDivider(color = WebBorderDark, thickness = 1.dp)
-
-                            PROFILE_DETAILS_SECTIONS.forEachIndexed { index, section ->
-                                SettingsItemRow(
-                                    item = section,
-                                    onClick = { showEditProfileModal = true }
-                                )
-                                if (index < PROFILE_DETAILS_SECTIONS.size - 1) {
-                                    HorizontalDivider(color = WebBorderDark, thickness = 1.dp)
-                                }
-                            }
-                        }
-                    }
+                )
+                if (index < OTHER_SECTIONS.size - 1) {
+                    HorizontalDivider(
+                        color = WebBorderDark.copy(alpha = 0.5f),
+                        thickness = 1.dp,
+                        modifier = Modifier.padding(start = 72.dp)
+                    )
                 }
-                Spacer(modifier = Modifier.height(24.dp))
             }
 
-            // Section 3: More Settings
-            item(key = "more_settings") {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .widthIn(max = 800.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(bottom = 14.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(WebPurple.copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Tune,
-                                contentDescription = null,
-                                tint = WebPurple,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = "More Settings",
-                                fontSize = 19.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = WebTextPrimary
-                            )
-                            Text(
-                                text = "Privacy, notifications, and account management",
-                                fontSize = 13.sp,
-                                color = WebTextSecondary
-                            )
-                        }
-                    }
-
-                    Card(
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = WebCardDark),
-                        border = BorderStroke(1.dp, WebBorderDark),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column {
-                            OTHER_SECTIONS.forEachIndexed { index, section ->
-                                SettingsItemRow(
-                                    item = section,
-                                    onClick = {
-                                        when (section.id) {
-                                            "privacy-settings" -> showPrivacyModal = true
-                                            "notifications" -> showNotificationsModal = true
-                                            "blocked" -> showBlockedModal = true
-                                            "help-support" -> onOpenHelpSupport?.invoke()
-                                            "terms-of-service" -> onOpenTerms?.invoke()
-                                            "delete-account" -> showDeleteAccountModal = true
-                                        }
-                                    }
-                                )
-                                if (index < OTHER_SECTIONS.size - 1) {
-                                    HorizontalDivider(color = WebBorderDark, thickness = 1.dp)
-                                }
-                            }
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(32.dp))
+            item(key = "divider_more") {
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(color = WebBorderDark.copy(alpha = 0.6f), thickness = 8.dp)
             }
 
-            // Footer: matching web: text-center pt-4 border-t border-[#1E293B]
+            // Footer & Logout (Flat Facebook style)
             item(key = "footer") {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .widthIn(max = 800.dp),
+                        .padding(horizontal = 16.dp, vertical = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    HorizontalDivider(color = WebBorderDark, thickness = 1.dp)
-                    Spacer(modifier = Modifier.height(20.dp))
-                    Text(
-                        text = "Feathered © 2025",
-                        fontSize = 13.sp,
-                        color = WebTextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
                     Button(
                         onClick = onLogout,
                         shape = RoundedCornerShape(8.dp),
@@ -607,8 +536,9 @@ fun SettingsScreen(
                             contentColor = Color(0xFFF87171)
                         ),
                         modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
                             .testTag("settings_logout_button")
-                            .height(44.dp)
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Logout,
@@ -619,10 +549,17 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Log Out",
-                            fontSize = 14.sp,
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text(
+                        text = "Feathered © 2025",
+                        fontSize = 13.sp,
+                        color = WebTextSecondary
+                    )
                 }
             }
         }

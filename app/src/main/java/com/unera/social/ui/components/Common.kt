@@ -500,8 +500,8 @@ fun FeatheredAvatar(
     onClick: (() -> Unit)? = null
 ) {
     val hasValidImage = !imageUrl.isNullOrBlank() &&
-        !imageUrl.contains("photo-1535713875002") &&
-        imageUrl != "null"
+        imageUrl != "null" &&
+        imageUrl != "undefined"
     val initials = remember(name, username) { getUserInitials(name, username) }
     val gradientColors = remember(name, username) {
         val cleanKey = name.ifBlank { username }

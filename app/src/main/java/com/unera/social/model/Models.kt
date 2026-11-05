@@ -121,7 +121,9 @@ data class UserReaction(
     val userId: Long,
     val userName: String = "",
     val userAvatar: String = "",
-    val type: String = "like"
+    val type: String = "like",
+    val username: String = "",
+    val isVerified: Boolean = false
 )
 
 data class LinkPreview(

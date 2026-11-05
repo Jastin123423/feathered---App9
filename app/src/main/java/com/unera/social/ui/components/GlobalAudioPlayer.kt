@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -26,6 +27,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 import coil.compose.AsyncImage
 import com.unera.social.model.AudioTrack
 import com.unera.social.model.User
@@ -68,6 +72,76 @@ fun GlobalAudioPlayer(
     modifier: Modifier = Modifier
 ) {
     if (currentTrack == null) return
+
+    val context = LocalContext.current
+    val effectiveVolume = remember(volume) { if (volume <= 0f) 1.0f else volume.coerceIn(0f, 1f) }
+
+    val exoPlayer = remember(context) {
+        ExoPlayer.Builder(context).build().apply {
+            repeatMode = if (isRepeat) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+            this.volume = effectiveVolume
+        }
+    }
+
+    DisposableEffect(exoPlayer) {
+        onDispose {
+            try {
+                exoPlayer.stop()
+                exoPlayer.release()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    // Media source loading
+    LaunchedEffect(currentTrack.id, currentTrack.url) {
+        val trackUrl = currentTrack.url.trim()
+        if (trackUrl.isNotBlank() && trackUrl != "null") {
+            try {
+                exoPlayer.stop()
+                exoPlayer.clearMediaItems()
+                val mediaItem = MediaItem.fromUri(trackUrl)
+                exoPlayer.setMediaItem(mediaItem)
+                exoPlayer.prepare()
+                exoPlayer.volume = effectiveVolume
+                if (isPlaying) {
+                    exoPlayer.play()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            if (!exoPlayer.isPlaying && exoPlayer.playbackState != Player.STATE_ENDED) {
+                exoPlayer.volume = effectiveVolume
+                exoPlayer.play()
+            }
+        } else {
+            if (exoPlayer.isPlaying) {
+                exoPlayer.pause()
+            }
+        }
+    }
+
+    LaunchedEffect(effectiveVolume) {
+        exoPlayer.volume = effectiveVolume
+    }
+
+    LaunchedEffect(isRepeat) {
+        exoPlayer.repeatMode = if (isRepeat) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+    }
+
+    LaunchedEffect(positionSeconds) {
+        val currentMs = exoPlayer.currentPosition
+        val targetMs = positionSeconds * 1000L
+        if (Math.abs(currentMs - targetMs) > 2500L && exoPlayer.duration > 0) {
+            exoPlayer.seekTo(targetMs)
+        }
+    }
 
     // Mini Player bar at bottom
     MiniAudioPlayerBar(

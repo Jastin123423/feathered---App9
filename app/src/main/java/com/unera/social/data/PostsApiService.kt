@@ -342,16 +342,19 @@ object PostsApiService {
             ?: rawObj.optString("username").takeIf { it.isNotBlank() && it != "null" }
             ?: if (authorName.isNotBlank() && !authorName.startsWith("User")) "@${authorName.lowercase().replace(" ", "")}" else ""
 
-        val avatar = authorObj?.optString("profile_image_url")?.takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
-            ?: authorObj?.optString("avatar_url")?.takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
-            ?: obj.optString("profile_image_url").takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
-            ?: rawObj.optString("profile_image_url").takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
-            ?: obj.optString("avatar_url").takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
-            ?: rawObj.optString("avatar_url").takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
+        val avatar = authorObj?.optString("profile_image_url")?.takeIf { it.isNotBlank() && it != "null" }
+            ?: authorObj?.optString("avatar_url")?.takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("profile_image_url").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("profile_image_url").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("avatar_url").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("avatar_url").takeIf { it.isNotBlank() && it != "null" }
             ?: ""
 
         val isVerified = authorObj?.optBoolean("is_verified", false)
-            ?: obj.optBoolean("is_verified", rawObj.optBoolean("is_verified", obj.optBoolean("verified", rawObj.optBoolean("verified", false))))
+            ?: (authorObj?.optInt("is_verified", 0) == 1)
+            || obj.optBoolean("is_verified", rawObj.optBoolean("is_verified", obj.optBoolean("verified", rawObj.optBoolean("verified", false))))
+            || obj.optInt("is_verified", 0) == 1
+            || rawObj.optInt("is_verified", 0) == 1
         val role = authorObj?.optString("role") ?: obj.optString("role", rawObj.optString("role", "user"))
 
         val author = User(
@@ -825,17 +828,20 @@ object PostsApiService {
             ?: obj.optString("username").takeIf { it.isNotBlank() && it != "null" }
             ?: rawObj.optString("username").takeIf { it.isNotBlank() && it != "null" }
             ?: if (authorName.isNotBlank() && !authorName.startsWith("User")) "@${authorName.lowercase().replace(" ", "")}" else ""
-        val avatar = authorObj?.optString("profile_image_url")?.takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
-            ?: authorObj?.optString("avatar_url")?.takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
-            ?: obj.optString("author_avatar").takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
-            ?: obj.optString("profile_image_url").takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
-            ?: rawObj.optString("profile_image_url").takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
-            ?: obj.optString("avatar_url").takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
-            ?: rawObj.optString("avatar_url").takeIf { it.isNotBlank() && it != "null" && !it.contains("photo-1535713875002") }
+        val avatar = authorObj?.optString("profile_image_url")?.takeIf { it.isNotBlank() && it != "null" }
+            ?: authorObj?.optString("avatar_url")?.takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("author_avatar").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("profile_image_url").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("profile_image_url").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("avatar_url").takeIf { it.isNotBlank() && it != "null" }
+            ?: rawObj.optString("avatar_url").takeIf { it.isNotBlank() && it != "null" }
             ?: ""
 
         val isVerified = authorObj?.optBoolean("is_verified", false)
-            ?: obj.optBoolean("is_verified", rawObj.optBoolean("is_verified", false))
+            ?: (authorObj?.optInt("is_verified", 0) == 1)
+            || obj.optBoolean("is_verified", rawObj.optBoolean("is_verified", false))
+            || obj.optInt("is_verified", 0) == 1
+            || rawObj.optInt("is_verified", 0) == 1
         val role = authorObj?.optString("role") ?: obj.optString("role", rawObj.optString("role", "user"))
 
         val author = User(
