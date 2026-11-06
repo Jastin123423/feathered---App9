@@ -253,12 +253,13 @@ fun CreateEventModal(
     groupId: Long? = null,
     groupName: String? = null
 ) {
+    val userCountry = remember(currentUser.location) { resolveUserCountry(currentUser.location) }
     var title by remember { mutableStateOf("") }
     var desc by remember { mutableStateOf("") }
     var date by remember { mutableStateOf("") }
     var time by remember { mutableStateOf("") }
-    var location by remember { mutableStateOf("") }
-    var visibility by remember { mutableStateOf(if (groupId != null) "group" else "worldwide") }
+    var location by remember { mutableStateOf(currentUser.location.ifBlank { "Dar es Salaam, Tanzania" }) }
+    var visibility by remember { mutableStateOf(if (groupId != null) "group" else "targeted") }
     var imageUri by remember { mutableStateOf<String?>(null) }
     var isUploading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -277,8 +278,7 @@ fun CreateEventModal(
     }
 
     val userFallbackLocation = remember(currentUser) {
-        // Safe location from user
-        "Dar es Salaam, Tanzania"
+        currentUser.location.ifBlank { "Dar es Salaam, Tanzania" }
     }
 
     val pageTitle = remember(groupId, groupName) {
@@ -796,7 +796,7 @@ fun CreateEventModal(
                     if (groupId == null) {
                         Column {
                             Text(
-                                text = "Audience",
+                                text = "Where to show event",
                                 fontSize = 14.sp,
                                 color = TextMuted,
                                 modifier = Modifier.padding(bottom = 8.dp)
@@ -806,6 +806,45 @@ fun CreateEventModal(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
+                                // Country-level card (Targeted to user's country from profile)
+                                Card(
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (visibility == "targeted") BrandBlue.copy(alpha = 0.12f) else SectionCardBg
+                                    ),
+                                    border = CardDefaults.outlinedCardBorder().copy(
+                                        brush = Brush.linearGradient(
+                                            listOf(
+                                                if (visibility == "targeted") BrandBlue else BorderColor,
+                                                if (visibility == "targeted") BrandBlue else BorderColor
+                                            )
+                                        )
+                                    ),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { visibility = "targeted" }
+                                        .testTag("audience_country_btn")
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(userCountry.flag, fontSize = 18.sp)
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "Across ${userCountry.name}",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp,
+                                                color = TextWhite
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "Show across ${userCountry.name} users based on your profile location.",
+                                            fontSize = 12.sp,
+                                            color = TextMuted
+                                        )
+                                    }
+                                }
+
                                 // Worldwide card
                                 Card(
                                     shape = RoundedCornerShape(16.dp),
@@ -843,51 +882,7 @@ fun CreateEventModal(
                                         }
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
-                                            text = "Visible broadly across Feathered.",
-                                            fontSize = 12.sp,
-                                            color = TextMuted
-                                        )
-                                    }
-                                }
-
-                                // Local Only card
-                                Card(
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = if (visibility == "targeted") BrandBlue.copy(alpha = 0.12f) else SectionCardBg
-                                    ),
-                                    border = CardDefaults.outlinedCardBorder().copy(
-                                        brush = Brush.linearGradient(
-                                            listOf(
-                                                if (visibility == "targeted") BrandBlue else BorderColor,
-                                                if (visibility == "targeted") BrandBlue else BorderColor
-                                            )
-                                        )
-                                    ),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clickable { visibility = "targeted" }
-                                        .testTag("audience_local_btn")
-                                ) {
-                                    Column(modifier = Modifier.padding(14.dp)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                imageVector = Icons.Default.Place,
-                                                contentDescription = null,
-                                                tint = LocalTargetRed,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = "Local Only",
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 14.sp,
-                                                color = TextWhite
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = "Prioritize people near this location.",
+                                            text = "Country rule ignored — visible to any user from any country.",
                                             fontSize = 12.sp,
                                             color = TextMuted
                                         )
@@ -897,10 +892,18 @@ fun CreateEventModal(
 
                             if (visibility == "targeted") {
                                 Text(
-                                    text = "The system will try to target users near the location you entered.",
+                                    text = "Your host country is ${userCountry.name} (from your profile). This event will be displayed to users in ${userCountry.name}.",
                                     fontSize = 12.sp,
                                     fontStyle = FontStyle.Italic,
-                                    color = TextMuted,
+                                    color = Color(0xFF38BDF8),
+                                    modifier = Modifier.padding(top = 8.dp)
+                                )
+                            } else {
+                                Text(
+                                    text = "Worldwide event: Any user from any country can see and join this event.",
+                                    fontSize = 12.sp,
+                                    fontStyle = FontStyle.Italic,
+                                    color = Color(0xFF38BDF8),
                                     modifier = Modifier.padding(top = 8.dp)
                                 )
                             }

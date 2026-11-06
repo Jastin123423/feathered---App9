@@ -33,6 +33,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.unera.social.model.Event
+import com.unera.social.model.User
 
 // Feathered Design Tokens
 private val BgDark = Color(0xFF050B18)
@@ -49,21 +50,38 @@ private val LocationRed = Color(0xFFF02849)
 @Composable
 fun EventsScreen(
     events: List<Event>,
+    currentUser: User? = null,
     onToggleInterested: (Long) -> Unit,
     onToggleGoing: (Long) -> Unit,
     onOpenCreateEvent: () -> Unit,
     onProfileClick: ((Long) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val viewerCountry = remember(currentUser?.location) { resolveUserCountry(currentUser?.location) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("All") }
     var selectedSort by remember { mutableStateOf("Date") } // "Date" or "Popular"
+    var countryFilterMode by remember { mutableStateOf("country") } // "country" (Across user's country) or "worldwide"
     var previewEvent by remember { mutableStateOf<Event?>(null) }
 
     val filterOptions = listOf("All", "Upcoming", "Going", "Interested", "Tech & Summits", "Music & Beach")
 
-    val filteredAndSortedEvents = remember(events, selectedFilter, selectedSort, searchQuery) {
+    val filteredAndSortedEvents = remember(events, selectedFilter, selectedSort, searchQuery, countryFilterMode, viewerCountry) {
         var list = events
+
+        // Filter by country location:
+        // If "country", show events in user's country, or events where visibility is worldwide (ignoring country restriction)
+        if (countryFilterMode == "country") {
+            list = list.filter { ev ->
+                ev.visibility == "worldwide" ||
+                ev.groupId != null ||
+                (currentUser != null && ev.organizer.id == currentUser.id) ||
+                ev.location.contains(viewerCountry.name, ignoreCase = true) ||
+                ev.organizer.location.contains(viewerCountry.name, ignoreCase = true) ||
+                resolveUserCountry(ev.location).code == viewerCountry.code ||
+                resolveUserCountry(ev.organizer.location).code == viewerCountry.code
+            }
+        }
 
         // Filter by category / tab
         list = when (selectedFilter) {
@@ -229,9 +247,67 @@ fun EventsScreen(
                 }
             }
 
-            // 3. Filter Chips & Sort Controls
+            // 3. Country Location Scope & Category Filter Chips
             item {
                 Column(modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)) {
+                    // Country Location Scope: "Across [Country]" vs "Worldwide"
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val isCountrySelected = countryFilterMode == "country"
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isCountrySelected) BrandBlue.copy(alpha = 0.2f) else CardBgDark,
+                            border = BorderStroke(1.dp, if (isCountrySelected) BrandBlue else BorderDark),
+                            modifier = Modifier
+                                .clickable { countryFilterMode = "country" }
+                                .testTag("events_country_scope_btn")
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text(text = viewerCountry.flag, fontSize = 14.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Across ${viewerCountry.name}",
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isCountrySelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isCountrySelected) Color(0xFF38BDF8) else TextMuted
+                                )
+                            }
+                        }
+
+                        val isWorldwideSelected = countryFilterMode == "worldwide"
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isWorldwideSelected) BrandBlue.copy(alpha = 0.2f) else CardBgDark,
+                            border = BorderStroke(1.dp, if (isWorldwideSelected) BrandBlue else BorderDark),
+                            modifier = Modifier
+                                .clickable { countryFilterMode = "worldwide" }
+                                .testTag("events_worldwide_scope_btn")
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text(text = "🌍", fontSize = 14.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Worldwide",
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isWorldwideSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isWorldwideSelected) Color(0xFF38BDF8) else TextMuted
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)

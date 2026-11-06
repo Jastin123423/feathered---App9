@@ -1854,6 +1854,7 @@ fun ProductDetailDialog(
 
 @Composable
 fun CreateProductDialog(
+    currentUser: User? = null,
     onDismiss: () -> Unit,
     onSubmit: (
         title: String,
@@ -1868,12 +1869,13 @@ fun CreateProductDialog(
         phone: String
     ) -> Unit
 ) {
+    val userCountry = remember(currentUser?.location) { resolveUserCountry(currentUser?.location) }
     var title by remember { mutableStateOf("") }
     var priceText by remember { mutableStateOf("") }
     var discountPriceText by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("electronics") }
-    var location by remember { mutableStateOf("Dar es Salaam, Tanzania") }
-    var countryCode by remember { mutableStateOf("TZ") }
+    var location by remember { mutableStateOf(currentUser?.location?.ifBlank { "Dar es Salaam, Tanzania" } ?: "Dar es Salaam, Tanzania") }
+    var countryCode by remember { mutableStateOf(userCountry.code) }
     var description by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("+255 712 345 678") }
     var imageUrlInput by remember { mutableStateOf("") }
@@ -2263,41 +2265,57 @@ fun CreateProductDialog(
                     }
                 }
 
-                // Country selector matching web
+                // Country selector: Auto-detected from user profile, hiding all other countries
                 item {
                     Column {
                         Text(
-                            text = "Country",
+                            text = "Country (from your profile)",
                             fontSize = 14.sp,
                             color = Color(0xFF94A3B8)
                         )
                         Spacer(modifier = Modifier.height(6.dp))
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(WEB_MARKETPLACE_COUNTRIES.filter { it.code != "all" }) { c ->
-                                val isSelected = countryCode.equals(c.code, ignoreCase = true)
-                                Surface(
-                                    onClick = { countryCode = c.code },
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = if (isSelected) Color(0xFF1877F2) else Color(0xFF0F172A),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B)),
-                                    modifier = Modifier.height(42.dp)
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFF0F172A),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 14.dp)
+                            ) {
+                                Text(text = userCountry.flag, fontSize = 20.sp)
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = userCountry.name,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFF8FAFC)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0xFF1877F2).copy(alpha = 0.15f))
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
                                 ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(horizontal = 12.dp)
-                                    ) {
-                                        Text(text = c.flag, fontSize = 16.sp)
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = c.name,
-                                            fontSize = 13.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (isSelected) Color.White else Color(0xFFF8FAFC)
-                                        )
-                                    }
+                                    Text(
+                                        text = "Auto-detected • ${getCurrencyLabel(userCountry.code)}",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFF38BDF8)
+                                    )
                                 }
                             }
                         }
+                        Text(
+                            text = "Your listing is automatically priced in ${getCurrencyLabel(userCountry.code)} and displayed to buyers across ${userCountry.name}.",
+                            fontSize = 12.sp,
+                            color = Color(0xFF64748B),
+                            modifier = Modifier.padding(top = 4.dp, start = 2.dp)
+                        )
                     }
                 }
 

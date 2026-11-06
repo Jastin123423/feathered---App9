@@ -82,10 +82,19 @@ object CommentsCache {
     fun updateCachedComment(commentId: Long, transform: (Comment) -> Comment) {
         var changed = false
         for ((key, list) in memoryCache) {
-            val idx = list.indexOfFirst { it.id == commentId }
-            if (idx >= 0) {
-                val updatedList = list.toMutableList()
-                updatedList[idx] = transform(updatedList[idx])
+            var listModified = false
+            val updatedList = list.map { parent ->
+                if (parent.id == commentId) {
+                    listModified = true
+                    transform(parent)
+                } else if (parent.replies.any { it.id == commentId }) {
+                    listModified = true
+                    parent.copy(replies = parent.replies.map { r -> if (r.id == commentId) transform(r) else r })
+                } else {
+                    parent
+                }
+            }
+            if (listModified) {
                 memoryCache[key] = updatedList
                 changed = true
             }

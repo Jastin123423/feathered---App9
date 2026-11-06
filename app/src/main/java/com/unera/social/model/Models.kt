@@ -146,7 +146,8 @@ data class Comment(
     val parentCommentId: Long? = null,
     val replies: List<Comment> = emptyList(),
     val isHidden: Boolean = false,
-    val userId: Long = author.id
+    val userId: Long = author.id,
+    val replyToAuthorName: String? = null
 )
 
 data class MediaMetaItem(

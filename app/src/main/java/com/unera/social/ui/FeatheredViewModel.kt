@@ -2288,6 +2288,69 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun updateCoverImage(uri: Uri) {
+        val current = _uiState.value.currentUser
+        val previousCover = current.coverImageUrl
+        // 1. Instant optimistic display (0ms)
+        val previewUrl = uri.toString()
+        val optimUser = current.copy(coverImageUrl = previewUrl)
+        _uiState.update { state ->
+            val updatedUsers = state.users.map { if (it.id == optimUser.id) optimUser else it }
+            state.copy(
+                currentUser = optimUser,
+                users = updatedUsers,
+                selectedUserProfile = if (state.selectedUserProfile?.id == optimUser.id) optimUser else state.selectedUserProfile
+            )
+        }
+
+        launchSafe {
+            try {
+                val context = getApplication<Application>()
+                // 2. Compress and 3. Upload to covers folder
+                val finalUrl = MediaUploadHelper.uploadCoverImage(context, uri)
+                if (finalUrl.isNullOrBlank()) {
+                    // Revert if failed
+                    _uiState.update { state ->
+                        val reverted = state.currentUser.copy(coverImageUrl = previousCover)
+                        val revertedUsers = state.users.map { if (it.id == reverted.id) reverted else it }
+                        state.copy(
+                            currentUser = reverted,
+                            users = revertedUsers,
+                            selectedUserProfile = if (state.selectedUserProfile?.id == reverted.id) reverted else state.selectedUserProfile
+                        )
+                    }
+                    return@launchSafe
+                }
+
+                // 4. Update user record in database
+                UserApiService.updateUserDetails(current.id, mapOf("cover_image_url" to finalUrl))
+
+                // 5. Update state with final URL and cache in session
+                val finalUser = _uiState.value.currentUser.copy(coverImageUrl = finalUrl)
+                _uiState.update { state ->
+                    val finalUsers = state.users.map { if (it.id == finalUser.id) finalUser else it }
+                    state.copy(
+                        currentUser = finalUser,
+                        users = finalUsers,
+                        selectedUserProfile = if (state.selectedUserProfile?.id == finalUser.id) finalUser else state.selectedUserProfile
+                    )
+                }
+                UserSessionManager.saveUser(context, finalUser)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _uiState.update { state ->
+                    val reverted = state.currentUser.copy(coverImageUrl = previousCover)
+                    val revertedUsers = state.users.map { if (it.id == reverted.id) reverted else it }
+                    state.copy(
+                        currentUser = reverted,
+                        users = revertedUsers,
+                        selectedUserProfile = if (state.selectedUserProfile?.id == reverted.id) reverted else state.selectedUserProfile
+                    )
+                }
+            }
+        }
+    }
+
     fun updateUserDetails(
         bio: String,
         work: String,
@@ -2297,20 +2360,37 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
         coverImageUrl: String? = null,
         profileImageUrl: String? = null
     ) {
+        val current = _uiState.value.currentUser
+        val updatedUser = current.copy(
+            bio = bio.trim(),
+            work = work.trim(),
+            education = education.trim(),
+            location = location.trim(),
+            website = website.trim(),
+            coverImageUrl = coverImageUrl ?: current.coverImageUrl,
+            profileImageUrl = profileImageUrl ?: current.profileImageUrl
+        )
         _uiState.update { state ->
-            val updatedUser = state.currentUser.copy(
-                bio = bio.trim(),
-                work = work.trim(),
-                education = education.trim(),
-                location = location.trim(),
-                website = website.trim(),
-                coverImageUrl = coverImageUrl ?: state.currentUser.coverImageUrl,
-                profileImageUrl = profileImageUrl ?: state.currentUser.profileImageUrl
-            )
+            val updatedUsers = state.users.map { if (it.id == updatedUser.id) updatedUser else it }
             state.copy(
                 currentUser = updatedUser,
+                users = updatedUsers,
                 selectedUserProfile = if (state.selectedUserProfile?.id == updatedUser.id) updatedUser else state.selectedUserProfile
             )
+        }
+        val context = getApplication<Application>()
+        UserSessionManager.saveUser(context, updatedUser)
+        launchSafe {
+            val payload = mutableMapOf<String, Any?>(
+                "bio" to bio.trim(),
+                "work" to work.trim(),
+                "education" to education.trim(),
+                "location" to location.trim(),
+                "website" to website.trim()
+            )
+            if (coverImageUrl != null) payload["cover_image_url"] = coverImageUrl
+            if (profileImageUrl != null) payload["profile_image_url"] = profileImageUrl
+            UserApiService.updateUserDetails(current.id, payload)
         }
     }
 

@@ -25,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
@@ -50,6 +51,16 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.zIndex
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.material.icons.automirrored.filled.Reply
+import kotlinx.coroutines.delay
 
 private fun formatCount(count: Int): String {
     return when {
@@ -716,9 +727,12 @@ fun DiscussionsSheetDialog(
     var postState by remember(post) { mutableStateOf(post) }
     var newCommentText by remember { mutableStateOf("") }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
-    var replyingTo by remember { mutableStateOf<String?>(null) }
+    var replyingToComment by remember { mutableStateOf<Comment?>(null) }
+    var replyingToAuthor by remember { mutableStateOf<String?>(null) }
+    var expandedCommentIds by remember { mutableStateOf(setOf<Long>()) }
     var showEmojiPicker by remember { mutableStateOf(false) }
     var selectedCommentForActions by remember { mutableStateOf<Comment?>(null) }
+    val listState = rememberLazyListState()
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -726,69 +740,44 @@ fun DiscussionsSheetDialog(
         selectedImageUri = uri
     }
 
-    var liveComments by remember(post.id) { mutableStateOf(post.comments) }
+    var liveComments by remember(post.id) {
+        mutableStateOf(FeedInteractionApiService.organizeCommentsIntoThreads(post.comments))
+    }
     var isLoadingComments by remember(post.id) { mutableStateOf(post.comments.isEmpty()) }
+    var hasAutoScrolledToLatest by remember(post.id) { mutableStateOf(false) }
 
     LaunchedEffect(post.id) {
         val fetched = FeedInteractionApiService.fetchComments(post, currentUser.id)
         if (fetched.isNotEmpty() || post.comments.isEmpty()) {
             val pending = liveComments.filter { it.id < 0 }
-            val filteredPending = pending.filter { p ->
-                fetched.none { f -> (f.author.id == p.author.id || f.author.id == currentUser.id) && f.text.trim() == p.text.trim() }
-            }
-            liveComments = filteredPending + fetched
+            val allMerged = (fetched + pending).distinctBy { it.id }
+            liveComments = FeedInteractionApiService.organizeCommentsIntoThreads(allMerged)
         }
         isLoadingComments = false
     }
 
     LaunchedEffect(post.comments) {
         if (post.comments.isNotEmpty()) {
-            val updated = liveComments.toMutableList()
-            var changed = false
-            for (pc in post.comments) {
-                val existingIndex = updated.indexOfFirst { lc ->
-                    lc.id == pc.id ||
-                    (lc.id < 0 && (lc.author.id == pc.author.id || lc.author.id == currentUser.id) && lc.text.trim() == pc.text.trim())
-                }
-                if (existingIndex >= 0) {
-                    val current = updated[existingIndex]
-                    val bestAuthor = if (pc.author.profileImageUrl.isNotBlank() && pc.author.name.isNotBlank()) {
-                        pc.author
-                    } else if (current.author.profileImageUrl.isNotBlank() && current.author.name.isNotBlank()) {
-                        current.author
-                    } else {
-                        currentUser
-                    }
-                    val reconciled = pc.copy(
-                        author = bestAuthor.copy(
-                            isVerified = bestAuthor.isVerified || current.author.isVerified || (currentUser.isVerified && (bestAuthor.id == currentUser.id || current.author.id == currentUser.id)),
-                            profileImageUrl = bestAuthor.profileImageUrl.ifBlank { current.author.profileImageUrl.ifBlank { currentUser.profileImageUrl } }
-                        ),
-                        text = pc.text.ifBlank { current.text }
-                    )
-                    if (updated[existingIndex] != reconciled) {
-                        updated[existingIndex] = reconciled
-                        changed = true
-                    }
-                } else {
-                    updated.add(0, pc)
-                    changed = true
-                }
-            }
-            val finalClean = updated.filter { c ->
-                if (c.id < 0) {
-                    updated.none { other -> other.id > 0 && other.text.trim() == c.text.trim() && (other.author.id == c.author.id || other.author.id == currentUser.id) }
-                } else true
-            }.distinctBy { it.id }
+            val pending = liveComments.filter { it.id < 0 }
+            val allMerged = (post.comments + pending).distinctBy { it.id }
+            liveComments = FeedInteractionApiService.organizeCommentsIntoThreads(allMerged)
+        }
+    }
 
-            if (changed || finalClean.size != liveComments.size) {
-                liveComments = finalClean
-            }
+    // Auto-scroll down to the latest discussion when opening the sheet
+    LaunchedEffect(liveComments.size, isLoadingComments) {
+        if (!isLoadingComments && liveComments.isNotEmpty() && !hasAutoScrolledToLatest) {
+            hasAutoScrolledToLatest = true
+            delay(150)
+            val target = (liveComments.size + 1).coerceAtLeast(0)
+            listState.animateScrollToItem(target)
         }
     }
 
     val quickEmojis = listOf("❤️", "🔥", "😂", "👏", "🙌", "😍", "✨", "💯", "🎉")
-    val totalDiscussions = if (liveComments.isNotEmpty()) liveComments.size else postState.commentsCount
+    val totalDiscussions = if (liveComments.isNotEmpty()) {
+        liveComments.sumOf { 1 + it.replies.size }
+    } else postState.commentsCount
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -875,6 +864,7 @@ fun DiscussionsSheetDialog(
 
                 // Scrollable content: Full Original Post Preview + List of comments
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
@@ -966,6 +956,7 @@ fun DiscussionsSheetDialog(
                     } else {
                         items(liveComments, key = { it.id }) { comment ->
                             val canDeleteComment = currentUser.role in listOf("admin", "moderator") || comment.author.id == currentUser.id
+                            val isExpanded = expandedCommentIds.contains(comment.id)
                             val itemType = when {
                                 post.postType == "group_post" || post.groupId != null -> "group_post"
                                 post.song != null || post.postType in listOf("song", "music") -> "song"
@@ -978,6 +969,14 @@ fun DiscussionsSheetDialog(
                                 CommentItemRow(
                                     comment = comment,
                                     canDelete = canDeleteComment,
+                                    isExpanded = isExpanded,
+                                    onToggleExpand = {
+                                        expandedCommentIds = if (isExpanded) {
+                                            expandedCommentIds - comment.id
+                                        } else {
+                                            expandedCommentIds + comment.id
+                                        }
+                                    },
                                     onLike = {
                                         liveComments = liveComments.map { c ->
                                             if (c.id == comment.id) {
@@ -1004,7 +1003,31 @@ fun DiscussionsSheetDialog(
                                         }
                                         onLikeComment(comment.id)
                                     },
-                                    onReply = { replyingTo = comment.author.name },
+                                    onReply = {
+                                        replyingToComment = comment
+                                        replyingToAuthor = comment.author.name
+                                    },
+                                    onLikeReply = { reply ->
+                                        liveComments = liveComments.map { p ->
+                                            if (p.id == comment.id) {
+                                                p.copy(replies = p.replies.map { r ->
+                                                    if (r.id == reply.id) {
+                                                        val newLiked = !r.isLiked
+                                                        val newCount = if (newLiked) r.likesCount + 1 else (r.likesCount - 1).coerceAtLeast(0)
+                                                        r.copy(isLiked = newLiked, likesCount = newCount)
+                                                    } else r
+                                                })
+                                            } else p
+                                        }
+                                        coroutineScope.launch {
+                                            FeedInteractionApiService.likeComment(itemType, reply.id, currentUser.id)
+                                        }
+                                        onLikeComment(reply.id)
+                                    },
+                                    onReplyToUser = { _, targetName ->
+                                        replyingToComment = comment
+                                        replyingToAuthor = targetName
+                                    },
                                     onToggleHide = {
                                         val newHidden = !comment.isHidden
                                         liveComments = liveComments.map { if (it.id == comment.id) it.copy(isHidden = newHidden) else it }
@@ -1033,7 +1056,7 @@ fun DiscussionsSheetDialog(
                 }
 
                 // Replying to banner if active
-                if (replyingTo != null) {
+                if (replyingToAuthor != null) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1043,10 +1066,23 @@ fun DiscussionsSheetDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Reply,
+                                contentDescription = null,
+                                tint = Color(0xFF38BDF8),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(text = "Replying to ", fontSize = 12.sp, color = Color(0xFF94A3B8))
-                            Text(text = replyingTo ?: "", fontSize = 12.sp, color = Color(0xFF1877F2), fontWeight = FontWeight.Bold)
+                            Text(text = replyingToAuthor ?: "", fontSize = 12.sp, color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold)
                         }
-                        IconButton(onClick = { replyingTo = null }, modifier = Modifier.size(22.dp)) {
+                        IconButton(
+                            onClick = {
+                                replyingToComment = null
+                                replyingToAuthor = null
+                            },
+                            modifier = Modifier.size(22.dp)
+                        ) {
                             Icon(imageVector = Icons.Default.Close, contentDescription = "Cancel reply", tint = Color.White, modifier = Modifier.size(16.dp))
                         }
                     }
@@ -1159,7 +1195,7 @@ fun DiscussionsSheetDialog(
                         onValueChange = { newCommentText = it },
                         placeholder = {
                             Text(
-                                text = if (replyingTo != null) "Reply to $replyingTo..." else "Comment as ${currentUser.name.split(" ").firstOrNull() ?: "you"}...",
+                                text = if (replyingToAuthor != null) "Reply to $replyingToAuthor..." else "Comment as ${currentUser.name.split(" ").firstOrNull() ?: "you"}...",
                                 color = Color(0xFF64748B),
                                 fontSize = 14.sp
                             )
@@ -1184,20 +1220,58 @@ fun DiscussionsSheetDialog(
                     IconButton(
                         onClick = {
                             if (canSend) {
-                                val fullText = if (replyingTo != null) "@$replyingTo $newCommentText" else newCommentText
+                                val trimmedText = newCommentText.trim()
                                 val tempId = -System.currentTimeMillis()
-                                val optimistic = Comment(
-                                    id = tempId,
-                                    author = currentUser,
-                                    text = fullText,
-                                    timestamp = "Just now",
-                                    imageUrl = selectedImageUri?.toString()
-                                )
-                                liveComments = listOf(optimistic) + liveComments.filter { it.id != tempId }
-                                onAddComment(fullText)
+                                if (replyingToComment != null) {
+                                    val parentId = replyingToComment!!.id
+                                    val targetAuthorName = replyingToAuthor ?: replyingToComment!!.author.name
+                                    val optimisticReply = Comment(
+                                        id = tempId,
+                                        author = currentUser,
+                                        text = trimmedText,
+                                        timestamp = "Just now",
+                                        parentCommentId = parentId,
+                                        replyToAuthorName = if (!targetAuthorName.equals(replyingToComment!!.author.name, ignoreCase = true)) targetAuthorName else null,
+                                        imageUrl = selectedImageUri?.toString()
+                                    )
+                                    // Add reply at the bottom of parent comment's replies
+                                    liveComments = liveComments.map { p ->
+                                        if (p.id == parentId) {
+                                            p.copy(replies = p.replies.filter { it.id != tempId } + optimisticReply)
+                                        } else p
+                                    }
+                                    expandedCommentIds = expandedCommentIds + parentId
+                                    coroutineScope.launch {
+                                        FeedInteractionApiService.addComment(
+                                            post = post,
+                                            userId = currentUser.id,
+                                            text = trimmedText,
+                                            parentCommentId = parentId,
+                                            imageUrl = selectedImageUri?.toString()
+                                        )
+                                    }
+                                    onAddComment(trimmedText)
+                                } else {
+                                    val optimistic = Comment(
+                                        id = tempId,
+                                        author = currentUser,
+                                        text = trimmedText,
+                                        timestamp = "Just now",
+                                        imageUrl = selectedImageUri?.toString()
+                                    )
+                                    // New comment appears DOWN below the old ones (chronological)
+                                    liveComments = liveComments.filter { it.id != tempId } + optimistic
+                                    onAddComment(trimmedText)
+                                    coroutineScope.launch {
+                                        delay(100)
+                                        val target = (liveComments.size + 1).coerceAtLeast(0)
+                                        listState.animateScrollToItem(target)
+                                    }
+                                }
                                 newCommentText = ""
                                 selectedImageUri = null
-                                replyingTo = null
+                                replyingToComment = null
+                                replyingToAuthor = null
                                 showEmojiPicker = false
                             }
                         },
@@ -1263,7 +1337,8 @@ fun DiscussionsSheetDialog(
                     selectedCommentForActions = null
                 },
                 onReply = { comment ->
-                    replyingTo = comment.author.name
+                    replyingToComment = comment
+                    replyingToAuthor = comment.author.name
                 }
             )
         }
@@ -1274,9 +1349,13 @@ fun DiscussionsSheetDialog(
 private fun CommentItemRow(
     comment: Comment,
     canDelete: Boolean = false,
+    isExpanded: Boolean = false,
+    onToggleExpand: () -> Unit = {},
     onLike: () -> Unit,
     onReact: (String) -> Unit = {},
     onReply: () -> Unit,
+    onLikeReply: (Comment) -> Unit = {},
+    onReplyToUser: (Comment, String) -> Unit = { _, _ -> },
     onToggleHide: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
     onMoreOptions: (() -> Unit)? = null,
@@ -1285,216 +1364,524 @@ private fun CommentItemRow(
     var showReactionDock by remember { mutableStateOf(false) }
     val currentReaction = getFacebookReaction(comment.myReaction)
 
-    Row(modifier = Modifier.fillMaxWidth()) {
-        FeatheredAvatar(
-            name = comment.author.name,
-            imageUrl = comment.author.profileImageUrl,
-            size = 36.dp,
-            username = comment.author.username,
-            onClick = onUserClick
-        )
-
-        Spacer(modifier = Modifier.width(10.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            // Bubble (#162137)
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(Color(0xFF162137))
-                    .clickable { onMoreOptions?.invoke() }
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
-            ) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable { onUserClick?.invoke() }
-                        ) {
-                            Text(
-                                text = comment.author.name,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 19.sp,
-                                color = Color(0xFFF8FAFC)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .drawBehind {
+                    if (comment.replies.isNotEmpty()) {
+                        val startX = 18.dp.toPx()
+                        val startY = 36.dp.toPx()
+                        if (size.height > startY) {
+                            drawLine(
+                                color = Color(0xFF334155),
+                                start = androidx.compose.ui.geometry.Offset(startX, startY),
+                                end = androidx.compose.ui.geometry.Offset(startX, size.height),
+                                strokeWidth = 1.5.dp.toPx(),
+                                cap = StrokeCap.Round
                             )
-                            if (comment.author.isVerified) {
-                                Spacer(modifier = Modifier.width(5.dp))
-                                VerifiedBadge(size = 16.dp)
+                        }
+                    }
+                }
+        ) {
+            FeatheredAvatar(
+                name = comment.author.name,
+                imageUrl = comment.author.profileImageUrl,
+                size = 36.dp,
+                username = comment.author.username,
+                onClick = onUserClick
+            )
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                // Bubble (#162137)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0xFF162137))
+                        .clickable { onMoreOptions?.invoke() }
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.clickable { onUserClick?.invoke() }
+                            ) {
+                                Text(
+                                    text = comment.author.name,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 19.sp,
+                                    color = Color(0xFFF8FAFC)
+                                )
+                                if (comment.author.isVerified) {
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    VerifiedBadge(size = 16.dp)
+                                }
+                                if (comment.isHidden) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(Color(0xFF334155))
+                                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                                    ) {
+                                        Text("Hidden", fontSize = 10.sp, color = Color(0xFF94A3B8), fontWeight = FontWeight.SemiBold)
+                                    }
+                                }
                             }
-                            if (comment.isHidden) {
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(Color(0xFF334155))
-                                        .padding(horizontal = 5.dp, vertical = 1.dp)
+
+                            if (onMoreOptions != null) {
+                                IconButton(
+                                    onClick = onMoreOptions,
+                                    modifier = Modifier.size(20.dp)
                                 ) {
-                                    Text("Hidden", fontSize = 10.sp, color = Color(0xFF94A3B8), fontWeight = FontWeight.SemiBold)
+                                    Icon(
+                                        imageVector = Icons.Default.MoreHoriz,
+                                        contentDescription = "Options",
+                                        tint = Color(0xFF94A3B8),
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
                             }
                         }
 
-                        if (onMoreOptions != null) {
-                            IconButton(
-                                onClick = onMoreOptions,
-                                modifier = Modifier.size(20.dp)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = comment.text,
+                            fontSize = 20.sp,
+                            color = Color(0xFFCBD5E1),
+                            lineHeight = 26.sp
+                        )
+                    }
+                }
+
+                // Sub-bar: Time, Like (Tap / Hold for 7 3D Reactions Dock), Reply, Options, Count
+                Row(
+                    modifier = Modifier
+                        .padding(start = 8.dp, top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text(
+                        text = comment.timestamp,
+                        fontSize = 11.sp,
+                        color = Color(0xFF94A3B8)
+                    )
+
+                    // 7 3D Facebook Reaction dock & button on comment
+                    Box {
+                        if (showReactionDock) {
+                            Box(
+                                modifier = Modifier
+                                    .offset(y = (-58).dp)
+                                    .zIndex(30f)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.MoreHoriz,
-                                    contentDescription = "Options",
-                                    tint = Color(0xFF94A3B8),
-                                    modifier = Modifier.size(16.dp)
+                                FacebookReactionDock(
+                                    onSelectReaction = { type ->
+                                        onReact(type)
+                                        showReactionDock = false
+                                    },
+                                    onDismiss = { showReactionDock = false }
                                 )
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .pointerInput(comment.id, showReactionDock) {
+                                    detectTapGestures(
+                                        onLongPress = { showReactionDock = true },
+                                        onTap = {
+                                            if (showReactionDock) showReactionDock = false
+                                            else onLike()
+                                        }
+                                    )
+                                }
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (currentReaction != null) {
+                                    Box(
+                                        modifier = Modifier.size(16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        AsyncImage(
+                                            model = currentReaction.gifRes,
+                                            contentDescription = currentReaction.label,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = currentReaction.label,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = currentReaction.color
+                                    )
+                                } else {
+                                    Text(
+                                        text = if (comment.isLiked) "❤️ Liked" else "🤍 Like",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (comment.isLiked) Color(0xFFF43F5E) else Color(0xFF94A3B8)
+                                    )
+                                }
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = comment.text,
-                        fontSize = 20.sp,
-                        color = Color(0xFFCBD5E1),
-                        lineHeight = 26.sp
+                        text = "Reply",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF94A3B8),
+                        modifier = Modifier.clickable(onClick = onReply)
+                    )
+
+                    if (onToggleHide != null) {
+                        Text(
+                            text = if (comment.isHidden) "Unhide" else "Hide",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (comment.isHidden) Color(0xFF38BDF8) else Color(0xFF94A3B8),
+                            modifier = Modifier.clickable(onClick = onToggleHide)
+                        )
+                    }
+
+                    if (canDelete && onDelete != null) {
+                        Text(
+                            text = "Delete",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFFEF4444),
+                            modifier = Modifier.clickable(onClick = onDelete)
+                        )
+                    }
+
+                    if (onMoreOptions != null) {
+                        Text(
+                            text = "Options",
+                            fontSize = 12.sp,
+                            color = Color(0xFF64748B),
+                            modifier = Modifier.clickable(onClick = onMoreOptions)
+                        )
+                    }
+
+                    if (comment.likesCount > 0) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            if (currentReaction != null) {
+                                Box(modifier = Modifier.size(14.dp), contentAlignment = Alignment.Center) {
+                                    AsyncImage(
+                                        model = currentReaction.gifRes,
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                            } else {
+                                Text("❤️", fontSize = 11.sp)
+                            }
+                            Text(
+                                text = "${comment.likesCount}",
+                                fontSize = 11.sp,
+                                color = currentReaction?.color ?: Color(0xFFF43F5E),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Facebook-Style Compact Threaded Replies
+        if (comment.replies.isNotEmpty()) {
+            CompactThreadedReplies(
+                parentComment = comment,
+                isExpanded = isExpanded,
+                onToggleExpand = onToggleExpand,
+                onLikeReply = onLikeReply,
+                onReplyToUser = onReplyToUser
+            )
+        }
+    }
+}
+
+@Composable
+private fun CompactThreadedReplies(
+    parentComment: Comment,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit,
+    onLikeReply: (Comment) -> Unit,
+    onReplyToUser: (Comment, String) -> Unit
+) {
+    val totalReplies = parentComment.replies.size
+    if (totalReplies == 0) return
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (!isExpanded && totalReplies > 1) {
+            // View previous replies row
+            val hiddenCount = totalReplies - 1
+            val label = if (hiddenCount == 1) "View previous reply" else "View previous $hiddenCount replies"
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .drawBehind {
+                        val startX = 18.dp.toPx()
+                        val curveEndX = 38.dp.toPx()
+                        val targetY = 16.dp.toPx()
+                        val stroke = 1.5.dp.toPx()
+
+                        // Vertical continuation line to next reply below
+                        drawLine(
+                            color = Color(0xFF334155),
+                            start = androidx.compose.ui.geometry.Offset(startX, 0f),
+                            end = androidx.compose.ui.geometry.Offset(startX, size.height),
+                            strokeWidth = stroke
+                        )
+
+                        // Curved branch to the right towards the text
+                        val path = Path().apply {
+                            moveTo(startX, 0f)
+                            quadraticBezierTo(
+                                startX, targetY,
+                                curveEndX, targetY
+                            )
+                        }
+                        drawPath(path, color = Color(0xFF334155), style = Stroke(width = stroke, cap = StrokeCap.Round))
+                    }
+                    .padding(start = 42.dp, top = 6.dp, bottom = 4.dp)
+                    .clickable(onClick = onToggleExpand),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = label,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFF8FAFC)
+                )
+            }
+
+            // Latest reply shown underneath
+            val latestReply = parentComment.replies.last()
+            CompactReplyItem(
+                reply = latestReply,
+                parentComment = parentComment,
+                isLast = true,
+                isExpanded = false,
+                onLike = { onLikeReply(latestReply) },
+                onReply = { onReplyToUser(latestReply, latestReply.author.name) }
+            )
+        } else {
+            // Expanded: display all replies
+            parentComment.replies.forEachIndexed { index, reply ->
+                val isLastReply = (index == parentComment.replies.lastIndex)
+                val isLastRow = isLastReply && (!isExpanded || totalReplies <= 1)
+
+                CompactReplyItem(
+                    reply = reply,
+                    parentComment = parentComment,
+                    isLast = isLastRow,
+                    isExpanded = isExpanded,
+                    onLike = { onLikeReply(reply) },
+                    onReply = { onReplyToUser(reply, reply.author.name) }
+                )
+            }
+
+            if (isExpanded && totalReplies > 1) {
+                // "Hide replies" button at the bottom
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .drawBehind {
+                            val startX = 18.dp.toPx()
+                            val curveEndX = 38.dp.toPx()
+                            val targetY = 14.dp.toPx()
+                            val stroke = 1.5.dp.toPx()
+
+                            // Terminal branch for "Hide replies"
+                            val path = Path().apply {
+                                moveTo(startX, 0f)
+                                quadraticBezierTo(
+                                    startX, targetY,
+                                    curveEndX, targetY
+                                )
+                            }
+                            drawPath(path, color = Color(0xFF334155), style = Stroke(width = stroke, cap = StrokeCap.Round))
+                        }
+                        .padding(start = 42.dp, top = 4.dp, bottom = 6.dp)
+                        .clickable(onClick = onToggleExpand),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Hide replies",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF94A3B8)
                     )
                 }
             }
+        }
+    }
+}
 
-            // Sub-bar: Time, Like (Tap / Hold for 7 3D Reactions Dock), Reply, Options, Count
-            Row(
+@Composable
+private fun CompactReplyItem(
+    reply: Comment,
+    parentComment: Comment,
+    isLast: Boolean,
+    isExpanded: Boolean,
+    onLike: () -> Unit,
+    onReply: () -> Unit
+) {
+    // Replying format:
+    // Bold replyer's name, followed by the name of the person being replied to in normal text.
+    // If the reply is long, truncate it with ellipsis.
+    val targetUser = reply.replyToAuthorName ?: if (!reply.author.name.equals(parentComment.author.name, ignoreCase = true)) {
+        parentComment.author.name
+    } else null
+
+    val cleanText = if (targetUser != null && reply.text.startsWith("@$targetUser", ignoreCase = true)) {
+        reply.text.removePrefix("@$targetUser").trimStart()
+    } else {
+        reply.text
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .drawBehind {
+                val startX = 18.dp.toPx()
+                val curveEndX = 38.dp.toPx()
+                val targetY = 16.dp.toPx()
+                val stroke = 1.5.dp.toPx()
+
+                if (!isLast) {
+                    drawLine(
+                        color = Color(0xFF334155),
+                        start = androidx.compose.ui.geometry.Offset(startX, 0f),
+                        end = androidx.compose.ui.geometry.Offset(startX, size.height),
+                        strokeWidth = stroke
+                    )
+                } else {
+                    drawLine(
+                        color = Color(0xFF334155),
+                        start = androidx.compose.ui.geometry.Offset(startX, 0f),
+                        end = androidx.compose.ui.geometry.Offset(startX, targetY - 6.dp.toPx()),
+                        strokeWidth = stroke
+                    )
+                }
+
+                val path = Path().apply {
+                    moveTo(startX, if (isLast) targetY - 6.dp.toPx() else 0f)
+                    quadraticBezierTo(
+                        startX, targetY,
+                        curveEndX, targetY
+                    )
+                }
+                drawPath(path, color = Color(0xFF334155), style = Stroke(width = stroke, cap = StrokeCap.Round))
+            }
+            .padding(start = 42.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        // Replyer's profile picture (24.dp)
+        FeatheredAvatar(
+            name = reply.author.name,
+            imageUrl = reply.author.profileImageUrl,
+            size = 24.dp,
+            username = reply.author.username
+        )
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            // Compact Bubble
+            Box(
                 modifier = Modifier
-                    .padding(start = 8.dp, top = 4.dp),
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xFF162137))
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                val annotatedString = buildAnnotatedString {
+                    // Bold replyer's name
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = Color(0xFFF8FAFC), fontSize = 13.sp)) {
+                        append(reply.author.name)
+                    }
+                    if (!targetUser.isNullOrBlank()) {
+                        append(" ")
+                        withStyle(SpanStyle(fontWeight = FontWeight.Normal, color = Color(0xFF93C5FD), fontSize = 13.sp)) {
+                            append(targetUser)
+                        }
+                    }
+                    if (cleanText.isNotBlank()) {
+                        append(" ")
+                        withStyle(SpanStyle(fontWeight = FontWeight.Normal, color = Color(0xFFCBD5E1), fontSize = 13.sp)) {
+                            append(cleanText)
+                        }
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = annotatedString,
+                        maxLines = if (isExpanded) 5 else 1,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 18.sp,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (reply.author.isVerified) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        VerifiedBadge(size = 12.dp)
+                    }
+                }
+            }
+
+            // Sub-actions: Time, Like, Reply, Count
+            Row(
+                modifier = Modifier.padding(start = 6.dp, top = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = comment.timestamp,
+                    text = reply.timestamp,
                     fontSize = 11.sp,
                     color = Color(0xFF94A3B8)
                 )
 
-                // 7 3D Facebook Reaction dock & button on comment
-                Box {
-                    if (showReactionDock) {
-                        Box(
-                            modifier = Modifier
-                                .offset(y = (-58).dp)
-                                .zIndex(30f)
-                        ) {
-                            FacebookReactionDock(
-                                onSelectReaction = { type ->
-                                    onReact(type)
-                                    showReactionDock = false
-                                },
-                                onDismiss = { showReactionDock = false }
-                            )
-                        }
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .pointerInput(comment.id, showReactionDock) {
-                                detectTapGestures(
-                                    onLongPress = { showReactionDock = true },
-                                    onTap = {
-                                        if (showReactionDock) showReactionDock = false
-                                        else onLike()
-                                    }
-                                )
-                            }
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (currentReaction != null) {
-                                Box(
-                                    modifier = Modifier.size(16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    AsyncImage(
-                                        model = currentReaction.gifRes,
-                                        contentDescription = currentReaction.label,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = currentReaction.label,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = currentReaction.color
-                                )
-                            } else {
-                                Text(
-                                    text = if (comment.isLiked) "❤️ Liked" else "🤍 Like",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (comment.isLiked) Color(0xFFF43F5E) else Color(0xFF94A3B8)
-                                )
-                            }
-                        }
-                    }
-                }
+                Text(
+                    text = if (reply.isLiked) "❤️ Liked" else "Like",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (reply.isLiked) Color(0xFFF43F5E) else Color(0xFF94A3B8),
+                    modifier = Modifier.clickable(onClick = onLike)
+                )
 
                 Text(
                     text = "Reply",
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF94A3B8),
                     modifier = Modifier.clickable(onClick = onReply)
                 )
 
-                if (onToggleHide != null) {
-                    Text(
-                        text = if (comment.isHidden) "Unhide" else "Hide",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (comment.isHidden) Color(0xFF38BDF8) else Color(0xFF94A3B8),
-                        modifier = Modifier.clickable(onClick = onToggleHide)
-                    )
-                }
-
-                if (canDelete && onDelete != null) {
-                    Text(
-                        text = "Delete",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFEF4444),
-                        modifier = Modifier.clickable(onClick = onDelete)
-                    )
-                }
-
-                if (onMoreOptions != null) {
-                    Text(
-                        text = "Options",
-                        fontSize = 12.sp,
-                        color = Color(0xFF64748B),
-                        modifier = Modifier.clickable(onClick = onMoreOptions)
-                    )
-                }
-
-                if (comment.likesCount > 0) {
+                if (reply.likesCount > 0) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        if (currentReaction != null) {
-                            Box(modifier = Modifier.size(14.dp), contentAlignment = Alignment.Center) {
-                                AsyncImage(
-                                    model = currentReaction.gifRes,
-                                    contentDescription = null,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
-                        } else {
-                            Text("❤️", fontSize = 11.sp)
-                        }
+                        Text("❤️", fontSize = 10.sp)
                         Text(
-                            text = "${comment.likesCount}",
-                            fontSize = 11.sp,
-                            color = currentReaction?.color ?: Color(0xFFF43F5E),
-                            fontWeight = FontWeight.Bold
+                            text = "${reply.likesCount}",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFF43F5E)
                         )
                     }
                 }
@@ -1502,3 +1889,4 @@ private fun CommentItemRow(
         }
     }
 }
+

@@ -179,11 +179,11 @@ fun MusicSystemScreen(
         modifier = modifier.fillMaxSize(),
         containerColor = Color(0xFF050B18),
         topBar = {
-            // Sticky Top Navigation Tabs
-            Surface(
-                color = Color(0xFF0B1120).copy(alpha = 0.95f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B)),
-                modifier = Modifier.fillMaxWidth()
+            // Sticky Top Navigation Tabs (Flat Facebook Style)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF050B18))
             ) {
                 Row(
                     modifier = Modifier
@@ -285,6 +285,7 @@ fun MusicSystemScreen(
                         }
                     }
                 }
+                HorizontalDivider(color = Color(0xFF1E293B), thickness = 0.8.dp)
             }
         }
     ) { innerPadding ->
@@ -458,144 +459,141 @@ private fun MusicFeedContent(
         contentPadding = PaddingValues(bottom = 80.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // Entertainment Header Card
+        // Entertainment Header (Flat Facebook Style)
         item {
-            Surface(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                color = Color(0xFF0F172A),
-                shape = RoundedCornerShape(24.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B))
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    // Header title & studio button
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "F-Music",
-                                color = Color.White,
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.ExtraBold
-                            )
-                            Text(
-                                text = "Discover trending sounds, creators and fresh vibes",
-                                color = Color(0xFF94A3B8),
-                                fontSize = 13.sp
-                            )
-                        }
-
-                        Button(
-                            onClick = onOpenStudio,
-                            shape = RoundedCornerShape(20.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF1877F2),
-                                contentColor = Color.White
-                            ),
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
-                        ) {
-                            Text("Studio", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Search input bar
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = onSearchQueryChange,
-                        placeholder = { Text("Search songs, artists...", color = Color(0xFF8D96A8), fontSize = 14.sp) },
-                        leadingIcon = {
-                            Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = Color(0xFF8D96A8))
-                        },
-                        trailingIcon = {
-                            if (searchQuery.isNotBlank()) {
-                                IconButton(onClick = { onSearchQueryChange("") }) {
-                                    Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", tint = Color(0xFF8D96A8))
-                                }
-                            }
-                        },
-                        shape = RoundedCornerShape(16.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color(0xFF070D1D),
-                            unfocusedContainerColor = Color(0xFF070D1D),
-                            focusedBorderColor = Color(0xFF1877F2),
-                            unfocusedBorderColor = Color(0xFF1E293B),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("music_search_bar"),
-                        singleLine = true
-                    )
-
-                    // Hero Banner Card
-                    if (heroSong != null && searchQuery.isBlank()) {
-                        Spacer(modifier = Modifier.height(14.dp))
-                        HeroBannerCard(
-                            song = heroSong,
-                            trackPlays = trackPlays,
-                            onPlay = { onPlaySong(heroSong) }
+                // Header title & studio button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "F-Music",
+                            color = Color.White,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            text = "Discover trending sounds, creators and fresh vibes",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 13.sp
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Quick Action Circles
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround
+                    Button(
+                        onClick = onOpenStudio,
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF1877F2),
+                            contentColor = Color.White
+                        ),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
                     ) {
-                        QuickActionItem(icon = Icons.Default.BarChart, label = "Charts", onClick = {})
-                        QuickActionItem(icon = Icons.Default.Album, label = "Albums", onClick = onOpenAlbums)
-                        QuickActionItem(icon = Icons.Default.QueueMusic, label = "Playlists", onClick = {})
-                        QuickActionItem(icon = Icons.Default.Category, label = "Genres", onClick = {})
+                        Text("Studio", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
+                }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                    // Genre Filter Chips
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(genres) { genre ->
-                            val isSelected = selectedGenre == genre
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = if (isSelected) Color(0xFF1877F2) else Color(0xFF070D1D),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) Color(0xFF1877F2) else Color(0xFF1E293B)),
-                                modifier = Modifier.clickable { onSelectGenre(genre) }
-                            ) {
-                                Text(
-                                    text = genre,
-                                    color = if (isSelected) Color.White else Color(0xFF94A3B8),
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                                )
+                // Search input bar
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = onSearchQueryChange,
+                    placeholder = { Text("Search songs, artists...", color = Color(0xFF8D96A8), fontSize = 14.sp) },
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = Color(0xFF8D96A8))
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotBlank()) {
+                            IconButton(onClick = { onSearchQueryChange("") }) {
+                                Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", tint = Color(0xFF8D96A8))
                             }
+                        }
+                    },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color(0xFF0F172A),
+                        unfocusedContainerColor = Color(0xFF0F172A),
+                        focusedBorderColor = Color(0xFF1877F2),
+                        unfocusedBorderColor = Color(0xFF1E293B),
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("music_search_bar"),
+                    singleLine = true
+                )
+
+                // Hero Banner Card
+                if (heroSong != null && searchQuery.isBlank()) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HeroBannerCard(
+                        song = heroSong,
+                        trackPlays = trackPlays,
+                        onPlay = { onPlaySong(heroSong) }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Quick Action Circles
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
+                    QuickActionItem(icon = Icons.Default.BarChart, label = "Charts", onClick = {})
+                    QuickActionItem(icon = Icons.Default.Album, label = "Albums", onClick = onOpenAlbums)
+                    QuickActionItem(icon = Icons.Default.QueueMusic, label = "Playlists", onClick = {})
+                    QuickActionItem(icon = Icons.Default.Category, label = "Genres", onClick = {})
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Genre Filter Chips
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(genres) { genre ->
+                        val isSelected = selectedGenre == genre
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = if (isSelected) Color(0xFF1877F2) else Color(0xFF0F172A),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) Color(0xFF1877F2) else Color(0xFF1E293B)),
+                            modifier = Modifier.clickable { onSelectGenre(genre) }
+                        ) {
+                            Text(
+                                text = genre,
+                                color = if (isSelected) Color.White else Color(0xFF94A3B8),
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                            )
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(color = Color(0xFF1E293B), thickness = 0.8.dp)
             }
         }
 
-        // Mini Now Playing Strip (if playing)
+        // Mini Now Playing Strip (if playing) (Flat Facebook Style)
         if (currentTrack != null) {
             item {
-                Surface(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFF0F172A),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B))
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF0F172A))
                 ) {
                     Row(
                         modifier = Modifier.padding(12.dp),
@@ -678,10 +676,7 @@ private fun MusicFeedContent(
             }
         } else if (allSongs.isEmpty()) {
             item {
-                Surface(
-                    color = Color(0xFF0F172A),
-                    shape = RoundedCornerShape(20.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B)),
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 24.dp)
@@ -865,8 +860,7 @@ private fun HeroBannerCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(200.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onPlay)
     ) {
         AsyncImage(
@@ -1213,8 +1207,7 @@ private fun SongRankedListItem(
     Surface(
         onClick = onPlay,
         color = if (isCurrent) Color(0xFF1877F2).copy(alpha = 0.15f) else Color.Transparent,
-        border = if (isCurrent) androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1877F2).copy(alpha = 0.4f)) else null,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         modifier = modifier.fillMaxWidth()
     ) {
         Row(
@@ -1286,9 +1279,7 @@ private fun SongRowItem(
 ) {
     Surface(
         onClick = onPlay,
-        color = Color(0xFF0F172A),
-        shape = RoundedCornerShape(12.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B)),
+        color = Color.Transparent,
         modifier = modifier.fillMaxWidth()
     ) {
         Row(
@@ -1424,9 +1415,7 @@ private fun AlbumsListContent(
         items(albums, key = { "item_" + it.name }) { album ->
             Surface(
                 onClick = { onSelectAlbum(album) },
-                color = Color(0xFF0F172A),
-                shape = RoundedCornerShape(14.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B)),
+                color = Color.Transparent,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -1493,12 +1482,10 @@ private fun AlbumDetailContent(
         contentPadding = PaddingValues(bottom = 80.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Banner Card
+        // Banner (Flat Facebook Style)
         item {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = Color(0xFF0F172A),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B))
+            Box(
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
                     modifier = Modifier
@@ -1585,9 +1572,8 @@ private fun AlbumDetailContent(
             val isCurrent = currentTrack?.id == song.id
             Surface(
                 onClick = { onPlaySong(song) },
-                color = if (isCurrent) Color(0xFF1877F2).copy(alpha = 0.15f) else Color(0xFF0F172A),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B)),
-                shape = RoundedCornerShape(12.dp),
+                color = if (isCurrent) Color(0xFF1877F2).copy(alpha = 0.15f) else Color.Transparent,
+                shape = RoundedCornerShape(8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
@@ -1676,47 +1662,42 @@ private fun CreatorStudioDashboard(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Banner card
+        // Banner (Flat Facebook Style)
         item {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = Color(0xFF0F172A),
-                shape = RoundedCornerShape(20.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Text(
+                    text = "Creator Studio",
+                    color = Color.White,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Upload your music and albums. Monitor your listener analytics.",
+                    color = Color(0xFF888888),
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                Button(
+                    onClick = onOpenUpload,
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF1877F2),
+                        contentColor = Color.White
+                    ),
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
                 ) {
-                    Text(
-                        text = "Creator Studio",
-                        color = Color.White,
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Upload your music and albums. Monitor your listener analytics.",
-                        color = Color(0xFF888888),
-                        fontSize = 13.sp,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    Button(
-                        onClick = onOpenUpload,
-                        shape = RoundedCornerShape(24.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF1877F2),
-                            contentColor = Color.White
-                        ),
-                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.CloudUpload, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Upload New Content", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    }
+                    Icon(imageVector = Icons.Default.CloudUpload, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Upload New Content", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 }
             }
         }
@@ -1755,35 +1736,25 @@ private fun CreatorStudioDashboard(
 
         // Catalog Header
         item {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = Color(0xFF0B1120),
-                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Your Catalog", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Text("Manage your uploaded music tracks", color = Color(0xFF888888), fontSize = 12.sp)
-                }
+                Text("Your Catalog", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("Manage your uploaded music tracks", color = Color(0xFF888888), fontSize = 12.sp)
             }
         }
 
         if (userSongs.isEmpty()) {
             item {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = Color(0xFF0B1120),
-                    shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B))
-                ) {
-                    Box(modifier = Modifier.padding(32.dp), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "No uploads yet. Tap 'Upload New Content' above to distribute your first song!",
-                            color = Color(0xFF666666),
-                            textAlign = TextAlign.Center,
-                            fontSize = 13.sp
-                        )
-                    }
+                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "No uploads yet. Tap 'Upload New Content' above to distribute your first song!",
+                        color = Color(0xFF666666),
+                        textAlign = TextAlign.Center,
+                        fontSize = 13.sp
+                    )
                 }
             }
         } else {
@@ -1791,8 +1762,7 @@ private fun CreatorStudioDashboard(
                 val plays = trackPlays["music:${song.id}"] ?: song.stats.plays
                 Surface(
                     onClick = { onPlaySong(song) },
-                    color = Color(0xFF0B1120),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B)),
+                    color = Color.Transparent,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -1845,11 +1815,10 @@ private fun MetricStatCard(
     iconTint: Color,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        modifier = modifier,
-        color = Color(0xFF0B1120),
-        shape = RoundedCornerShape(16.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B))
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF0F172A))
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -1956,11 +1925,11 @@ private fun UploadSongStudio(
         // Upload progress indicator if uploading
         if (uploadProgress != null) {
             item {
-                Surface(
-                    color = Color(0xFF0F172A),
-                    shape = RoundedCornerShape(14.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1877F2)),
-                    modifier = Modifier.fillMaxWidth()
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF0F172A))
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
@@ -1982,15 +1951,9 @@ private fun UploadSongStudio(
             }
         }
 
-        // Mode Switch: Single vs Album
+        // Form Content (Flat Facebook Style)
         item {
-            Surface(
-                color = Color(0xFF0F172A),
-                shape = RoundedCornerShape(16.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -2523,7 +2486,6 @@ private fun UploadSongStudio(
             }
         }
     }
-}
 
 // ==========================================
 // 6. ARTIST PROFILE RELEASES VIEW

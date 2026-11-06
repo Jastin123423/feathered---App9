@@ -470,6 +470,46 @@ object UserApiService {
         null
     }
 
+    /**
+     * PUT /api/users
+     * Updates user details including cover_image_url, profile_image_url, bio, etc.
+     */
+    suspend fun updateUserDetails(userId: Long, data: Map<String, Any?>): Boolean = withContext(Dispatchers.IO) {
+        if (userId <= 0L) return@withContext false
+        try {
+            val url = URL("$BASE_URL/api/users")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "PUT"
+                doOutput = true
+                connectTimeout = 10000
+                readTimeout = 10000
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                setRequestProperty("Accept", "application/json")
+                setRequestProperty("User-Agent", USER_AGENT)
+                setRequestProperty("x-user-id", userId.toString())
+            }
+
+            val payload = JSONObject().apply {
+                put("id", userId)
+                data.forEach { (k, v) ->
+                    if (v != null) put(k, v)
+                }
+            }
+
+            OutputStreamWriter(conn.outputStream, "UTF-8").use {
+                it.write(payload.toString())
+                it.flush()
+            }
+
+            val code = conn.responseCode
+            conn.disconnect()
+            return@withContext code in 200..299
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return@withContext false
+        }
+    }
+
     fun parseSuggestionJson(obj: JSONObject): User? {
         val id = obj.optLong("id", obj.optLong("user_id", 0L))
         if (id <= 0L) return null

@@ -45,6 +45,10 @@ import com.unera.social.model.*
 import com.unera.social.ui.components.InstagramVideoCard
 import com.unera.social.ui.components.GalleryViewerDialog
 import com.unera.social.ui.theme.*
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 
 /**
  * 1:1 Parity with Web UserProfile.tsx
@@ -81,6 +85,7 @@ fun ProfileScreen(
     onSharePost: (Long) -> Unit = {},
     onOpenProduct: (Product) -> Unit = {},
     onUpdateUserDetails: (bio: String, work: String, education: String, location: String, website: String) -> Unit = { _, _, _, _, _ -> },
+    onUpdateCoverImage: ((Uri) -> Unit)? = null,
     onFollowUser: (Long) -> Unit = {},
     onProfileClick: (User) -> Unit = {},
     onMessageUser: (User) -> Unit = {},
@@ -98,6 +103,14 @@ fun ProfileScreen(
 ) {
     val isMe = user.id == currentUser.id
     val isAdminOrMod = currentUser.role == "admin" || currentUser.role == "moderator"
+
+    val coverPhotoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            onUpdateCoverImage?.invoke(uri)
+        }
+    }
 
     var selectedTab by remember { mutableStateOf("Posts") }
     var showEditProfileModal by remember { mutableStateOf(false) }
@@ -407,7 +420,13 @@ fun ProfileScreen(
                     if (isMe) {
                         Surface(
                             onClick = {
-                                if (isGuest) onRequestAuth() else { showEditProfileModal = true }
+                                if (isGuest) {
+                                    onRequestAuth()
+                                } else {
+                                    coverPhotoPickerLauncher.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                    )
+                                }
                             },
                             color = Color.Black.copy(alpha = 0.55f),
                             shape = RoundedCornerShape(8.dp),
@@ -1511,7 +1530,7 @@ fun EmptyStateView(
 }
 
 /**
- * Edit Profile Modal matching Web EditProfileModal
+ * Edit Profile Full Page Flat Layout (Facebook Pages Style)
  * Fields: Bio, Work, Education, Location, Website
  */
 @Composable
@@ -1520,192 +1539,217 @@ fun EditProfileModal(
     onDismiss: () -> Unit,
     onSave: (bio: String, work: String, edu: String, loc: String, web: String) -> Unit
 ) {
+    androidx.activity.compose.BackHandler { onDismiss() }
+
     var bio by remember { mutableStateOf(user.bio) }
     var work by remember { mutableStateOf(user.work) }
     var education by remember { mutableStateOf(user.education) }
     var location by remember { mutableStateOf(user.location) }
     var website by remember { mutableStateOf(user.website) }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = Color(0xFF0F172A),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B)),
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 24.dp)
+                .fillMaxSize()
+                .background(Color(0xFF0B1120))
+                .statusBarsPadding()
+                .navigationBarsPadding()
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                // Header
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Flat Top App Bar (Facebook Style)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                        .padding(horizontal = 8.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Edit Profile",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = Color(0xFFF8FAFC)
-                    )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Filled.Close, contentDescription = "Close", tint = Color(0xFF94A3B8))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color(0xFFF8FAFC)
+                        )
+                    }
+                    Text(
+                        text = "Edit profile",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 19.sp,
+                        color = Color(0xFFF8FAFC),
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(
+                        onClick = {
+                            onSave(bio, work, education, location, website)
+                            onDismiss()
+                        }
+                    ) {
+                        Text(
+                            text = "Save",
+                            color = Color(0xFF1877F2),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
                     }
                 }
 
-                HorizontalDivider(color = Color(0xFF1E293B))
+                HorizontalDivider(color = Color(0xFF1E293B), thickness = 0.8.dp)
 
+                // Flat Content without boxed containers
                 Column(
                     modifier = Modifier
-                        .weight(1f, fill = false)
+                        .weight(1f)
                         .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Bio Input
+                    Text(
+                        text = "Your profile details are shown to people across Feathered. Keep them updated to help people discover you.",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+
+                    // Bio section
                     Column {
-                        Text("Bio", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("Bio", color = Color(0xFFCBD5E1), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(modifier = Modifier.height(6.dp))
                         OutlinedTextField(
                             value = bio,
                             onValueChange = { bio = it },
-                            placeholder = { Text("Tell people about yourself...") },
+                            placeholder = { Text("Tell people about yourself...", color = Color(0xFF64748B)) },
                             modifier = Modifier.fillMaxWidth(),
                             maxLines = 4,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color(0xFF1E293B),
-                                unfocusedContainerColor = Color(0xFF1E293B),
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
                                 focusedTextColor = Color(0xFFF8FAFC),
                                 unfocusedTextColor = Color(0xFFF8FAFC),
                                 focusedBorderColor = Color(0xFF1877F2),
                                 unfocusedBorderColor = Color(0xFF334155)
-                            )
+                            ),
+                            shape = RoundedCornerShape(8.dp)
                         )
                     }
 
-                    // Work Input
+                    HorizontalDivider(color = Color(0xFF1E293B).copy(alpha = 0.6f), thickness = 0.5.dp)
+
+                    // Work section
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.Work, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Work", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            Icon(Icons.Filled.Work, null, tint = Color(0xFF1877F2), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Work", color = Color(0xFFCBD5E1), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         OutlinedTextField(
                             value = work,
                             onValueChange = { work = it },
-                            placeholder = { Text("Add workplace or role") },
+                            placeholder = { Text("Add workplace or role", color = Color(0xFF64748B)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color(0xFF1E293B),
-                                unfocusedContainerColor = Color(0xFF1E293B),
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
                                 focusedTextColor = Color(0xFFF8FAFC),
                                 unfocusedTextColor = Color(0xFFF8FAFC),
                                 focusedBorderColor = Color(0xFF1877F2),
                                 unfocusedBorderColor = Color(0xFF334155)
-                            )
+                            ),
+                            shape = RoundedCornerShape(8.dp)
                         )
                     }
 
-                    // Education Input
+                    HorizontalDivider(color = Color(0xFF1E293B).copy(alpha = 0.6f), thickness = 0.5.dp)
+
+                    // Education section
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.School, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Education", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            Icon(Icons.Filled.School, null, tint = Color(0xFF1877F2), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Education", color = Color(0xFFCBD5E1), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         OutlinedTextField(
                             value = education,
                             onValueChange = { education = it },
-                            placeholder = { Text("Add university or high school") },
+                            placeholder = { Text("Add university or high school", color = Color(0xFF64748B)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color(0xFF1E293B),
-                                unfocusedContainerColor = Color(0xFF1E293B),
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
                                 focusedTextColor = Color(0xFFF8FAFC),
                                 unfocusedTextColor = Color(0xFFF8FAFC),
                                 focusedBorderColor = Color(0xFF1877F2),
                                 unfocusedBorderColor = Color(0xFF334155)
-                            )
+                            ),
+                            shape = RoundedCornerShape(8.dp)
                         )
                     }
 
-                    // Location Input
+                    HorizontalDivider(color = Color(0xFF1E293B).copy(alpha = 0.6f), thickness = 0.5.dp)
+
+                    // Location section
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.Place, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Location", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            Icon(Icons.Filled.Place, null, tint = Color(0xFF1877F2), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Location", color = Color(0xFFCBD5E1), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         OutlinedTextField(
                             value = location,
                             onValueChange = { location = it },
-                            placeholder = { Text("Add your city") },
+                            placeholder = { Text("Add current city and country", color = Color(0xFF64748B)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color(0xFF1E293B),
-                                unfocusedContainerColor = Color(0xFF1E293B),
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
                                 focusedTextColor = Color(0xFFF8FAFC),
                                 unfocusedTextColor = Color(0xFFF8FAFC),
                                 focusedBorderColor = Color(0xFF1877F2),
                                 unfocusedBorderColor = Color(0xFF334155)
-                            )
+                            ),
+                            shape = RoundedCornerShape(8.dp)
                         )
                     }
 
-                    // Website Input
+                    HorizontalDivider(color = Color(0xFF1E293B).copy(alpha = 0.6f), thickness = 0.5.dp)
+
+                    // Website section
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.Link, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Website", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            Icon(Icons.Filled.Link, null, tint = Color(0xFF1877F2), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Website", color = Color(0xFFCBD5E1), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         OutlinedTextField(
                             value = website,
                             onValueChange = { website = it },
-                            placeholder = { Text("https://example.com") },
+                            placeholder = { Text("https://example.com", color = Color(0xFF64748B)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color(0xFF1E293B),
-                                unfocusedContainerColor = Color(0xFF1E293B),
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
                                 focusedTextColor = Color(0xFFF8FAFC),
                                 unfocusedTextColor = Color(0xFFF8FAFC),
                                 focusedBorderColor = Color(0xFF1877F2),
                                 unfocusedBorderColor = Color(0xFF334155)
-                            )
+                            ),
+                            shape = RoundedCornerShape(8.dp)
                         )
                     }
-                }
 
-                HorizontalDivider(color = Color(0xFF1E293B))
-
-                // Footer Actions
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancel", color = Color(0xFF94A3B8))
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = { onSave(bio, work, education, location, website) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Save Details", fontWeight = FontWeight.Bold)
-                    }
+                    Spacer(modifier = Modifier.height(32.dp))
                 }
             }
         }

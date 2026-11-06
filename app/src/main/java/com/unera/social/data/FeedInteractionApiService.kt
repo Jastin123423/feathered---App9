@@ -323,10 +323,36 @@ object FeedInteractionApiService {
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        if (commentsList.isNotEmpty()) {
-            CommentsCache.setCachedComments(CommentsCache.resolveItemType(post), post.id, commentsList)
+        val organizedComments = organizeCommentsIntoThreads(commentsList)
+        if (organizedComments.isNotEmpty()) {
+            CommentsCache.setCachedComments(CommentsCache.resolveItemType(post), post.id, organizedComments)
         }
-        commentsList
+        organizedComments
+    }
+
+    /**
+     * Organizes flat or nested comments into top-level comments with threaded replies in chronological order.
+     * Oldest comments are at the top, and newer comments appear down below.
+     */
+    fun organizeCommentsIntoThreads(comments: List<Comment>): List<Comment> {
+        val topLevel = comments.filter { it.parentCommentId == null || it.parentCommentId <= 0 }.toMutableList()
+        val repliesMap = comments.filter { it.parentCommentId != null && it.parentCommentId > 0 }.groupBy { it.parentCommentId!! }
+
+        val handledReplyIds = mutableSetOf<Long>()
+        val result = topLevel.map { parent ->
+            val directReplies = parent.replies
+            val extraReplies = repliesMap[parent.id] ?: emptyList()
+            val allReplies = (directReplies + extraReplies).distinctBy { it.id }.sortedBy { it.id }
+            handledReplyIds.addAll(allReplies.map { it.id })
+            parent.copy(replies = allReplies)
+        }.sortedBy { it.id } // Chronological: oldest at top, newest at bottom
+
+        val unhandledReplies = comments.filter { it.parentCommentId != null && it.parentCommentId > 0 && !handledReplyIds.contains(it.id) }
+        return if (unhandledReplies.isNotEmpty()) {
+            (result + unhandledReplies).sortedBy { it.id }
+        } else {
+            result
+        }
     }
 
 data class AddCommentResult(
@@ -894,6 +920,19 @@ data class AddCommentResult(
             obj.optLong("parent_id")
         } else null
         val isHidden = obj.optBoolean("is_hidden", false) || obj.optInt("hidden", 0) == 1 || obj.optBoolean("hidden", false)
+        val replyToAuthorName = obj.optString("reply_to_name").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("reply_to_author_name").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optString("reply_to_user").takeIf { it.isNotBlank() && it != "null" }
+            ?: obj.optJSONObject("reply_to_user")?.optString("name")?.takeIf { it.isNotBlank() && it != "null" }
+
+        val nestedReplies = mutableListOf<Comment>()
+        val repliesArr = obj.optJSONArray("replies")
+        if (repliesArr != null) {
+            for (r in 0 until repliesArr.length()) {
+                val rObj = repliesArr.optJSONObject(r) ?: continue
+                parseComment(rObj, viewerId)?.let { nestedReplies.add(it) }
+            }
+        }
 
         return Comment(
             id = id,
@@ -904,8 +943,10 @@ data class AddCommentResult(
             isLiked = isLiked,
             imageUrl = imageUrl,
             parentCommentId = parentCommentId,
+            replies = nestedReplies,
             isHidden = isHidden,
-            userId = resolvedUserId
+            userId = resolvedUserId,
+            replyToAuthorName = replyToAuthorName
         )
     }
 }

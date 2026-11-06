@@ -261,6 +261,37 @@ object MediaUploadHelper {
     }
 
     /**
+     * Compresses and uploads a user cover photo to /api/upload with folder="covers".
+     * Returns the uploaded URL, matching the web implementation.
+     */
+    suspend fun uploadCoverImage(context: Context, uri: Uri): String? = withContext(Dispatchers.IO) {
+        val (bitmap, _) = decodeAndOrientBitmap(context, uri)
+        if (bitmap == null) return@withContext null
+        try {
+            val compressedBytes = compressCoverImage(bitmap)
+            val filename = "cover_${System.currentTimeMillis()}.jpg"
+            val resp = uploadSingleFile(
+                fileBytes = compressedBytes,
+                fileName = filename,
+                mimeType = "image/jpeg",
+                folder = "covers"
+            )
+            val rawUrl = resp?.optString("url")?.takeIf { it.isNotBlank() && it != "null" }
+            if (rawUrl != null) {
+                val cleanUrl = rawUrl.replace(Regex("\\?.*$"), "")
+                "$cleanUrl?t=${System.currentTimeMillis()}"
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    /**
      * Builds and uploads the 3-variant image bundle (thumb, feed, full) matching web Imagecompression.ts:
      * - thumb: ~320px JPEG, quality 72%
      * - feed: ~1080px JPEG, quality 82%

@@ -402,6 +402,7 @@ fun FeatheredApp(
                 Screen.EVENTS -> {
                     EventsScreen(
                         events = uiState.events,
+                        currentUser = uiState.currentUser,
                         onToggleInterested = {
                             if (uiState.isGuest) viewModel.openAuth("login") else viewModel.toggleInterestedEvent(it)
                         },
@@ -455,6 +456,9 @@ fun FeatheredApp(
                         onOpenProduct = { product -> viewModel.setSelectedProductForDetail(product) },
                         onUpdateUserDetails = { bio, work, edu, loc, web ->
                             viewModel.updateUserDetails(bio, work, edu, loc, web)
+                        },
+                        onUpdateCoverImage = { uri ->
+                            viewModel.updateCoverImage(uri)
                         },
                         onFollowUser = { viewModel.toggleFollowUser(it) },
                         onProfileClick = { targetUser ->
@@ -811,6 +815,7 @@ fun FeatheredApp(
     if (uiState.showCreateProductDialog) {
         val context = androidx.compose.ui.platform.LocalContext.current
         CreateProductDialog(
+            currentUser = uiState.currentUser,
             onDismiss = { viewModel.setShowCreateProductDialog(false) },
             onSubmit = { title, price, discountPrice, category, location, country, description, imageUrl, images, phone ->
                 viewModel.createProduct(

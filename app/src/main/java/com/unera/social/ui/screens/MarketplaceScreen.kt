@@ -72,6 +72,47 @@ val WEB_MARKETPLACE_COUNTRIES = listOf(
     MarketCountryItem("AE", "UAE", "AED", "AED", "🇦🇪")
 )
 
+/**
+ * Auto-detect user's country from profile location string (e.g. "Dar es Salaam, Tanzania", "Nairobi, Kenya")
+ */
+fun resolveUserCountry(location: String?): MarketCountryItem {
+    val loc = location?.trim().orEmpty()
+    if (loc.isBlank()) return WEB_MARKETPLACE_COUNTRIES.first { it.code == "TZ" }
+
+    // Direct code matching
+    val byCode = WEB_MARKETPLACE_COUNTRIES.firstOrNull { it.code != "all" && it.code.equals(loc, ignoreCase = true) }
+    if (byCode != null) return byCode
+
+    // Country name matching
+    val byName = WEB_MARKETPLACE_COUNTRIES.firstOrNull { it.code != "all" && loc.contains(it.name, ignoreCase = true) }
+    if (byName != null) return byName
+
+    // Common city / region mappings
+    if (loc.contains("Tanzania", ignoreCase = true) || loc.contains("Dar es Salaam", ignoreCase = true) || loc.contains("Zanzibar", ignoreCase = true) || loc.contains("Arusha", ignoreCase = true) || loc.contains("Mwanza", ignoreCase = true) || loc.contains("Dodoma", ignoreCase = true)) {
+        return WEB_MARKETPLACE_COUNTRIES.first { it.code == "TZ" }
+    }
+    if (loc.contains("Kenya", ignoreCase = true) || loc.contains("Nairobi", ignoreCase = true) || loc.contains("Mombasa", ignoreCase = true)) {
+        return WEB_MARKETPLACE_COUNTRIES.first { it.code == "KE" }
+    }
+    if (loc.contains("Uganda", ignoreCase = true) || loc.contains("Kampala", ignoreCase = true)) {
+        return WEB_MARKETPLACE_COUNTRIES.first { it.code == "UG" }
+    }
+    if (loc.contains("Nigeria", ignoreCase = true) || loc.contains("Lagos", ignoreCase = true) || loc.contains("Abuja", ignoreCase = true)) {
+        return WEB_MARKETPLACE_COUNTRIES.first { it.code == "NG" }
+    }
+    if (loc.contains("South Africa", ignoreCase = true) || loc.contains("Cape Town", ignoreCase = true) || loc.contains("Johannesburg", ignoreCase = true)) {
+        return WEB_MARKETPLACE_COUNTRIES.first { it.code == "ZA" }
+    }
+    if (loc.contains("USA", ignoreCase = true) || loc.contains("United States", ignoreCase = true) || loc.contains("America", ignoreCase = true)) {
+        return WEB_MARKETPLACE_COUNTRIES.first { it.code == "US" }
+    }
+    if (loc.contains("UK", ignoreCase = true) || loc.contains("United Kingdom", ignoreCase = true) || loc.contains("London", ignoreCase = true) || loc.contains("Britain", ignoreCase = true)) {
+        return WEB_MARKETPLACE_COUNTRIES.first { it.code == "GB" }
+    }
+
+    return WEB_MARKETPLACE_COUNTRIES.first { it.code == "TZ" }
+}
+
 fun getCurrencyLabel(countryCode: String): String {
     return when (countryCode.uppercase()) {
         "TZ", "TZS" -> "TSh"

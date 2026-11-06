@@ -70,6 +70,14 @@ import com.unera.social.ui.components.FacebookReactionButton
 import com.unera.social.ui.components.REACTION_EMOJIS
 import com.unera.social.ui.components.TextPostBackgroundView
 import com.unera.social.ui.components.getReactionEmoji
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
+import com.unera.social.data.CommentsCache
 
 fun isCareerCategory(category: String?, name: String? = null): Boolean {
     val c = category?.lowercase() ?: ""
@@ -1594,6 +1602,22 @@ fun GroupPostCard(
     var showMoreMenu by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
+    val cacheVersion by CommentsCache.cacheVersion.collectAsState()
+    var previewComment by remember(post.id, post.comments, cacheVersion) {
+        mutableStateOf(
+            post.comments.firstOrNull() ?: CommentsCache.getCachedComments("group_post", post.id)?.firstOrNull()
+        )
+    }
+
+    LaunchedEffect(post.id, post.commentsCount) {
+        if (previewComment == null && post.commentsCount > 0) {
+            val fetched = CommentsCache.ensurePreviewComment(post.toPost(group), currentUser.id)
+            if (fetched != null) {
+                previewComment = fetched
+            }
+        }
+    }
+
     val isCareer = group.category == "recruitment" ||
         isCareerCategory(group.category, group.name) ||
         !post.jobTitle.isNullOrBlank()
@@ -2027,57 +2051,236 @@ fun GroupPostCard(
                 }
             }
 
-            // Comment Preview (Latest comment)
-            if (post.comments.isNotEmpty()) {
-                val latestComment = post.comments.last()
+            // Comment Preview with Facebook-Style Compact Threaded Reply support
+            if (previewComment != null) {
+                val currentComment = previewComment!!
                 HorizontalDivider(color = Color(0xFF1E293B).copy(alpha = 0.5f), thickness = 1.dp)
-                Row(
+
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(onClick = onComment)
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.Top
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
                 ) {
-                    FeatheredAvatar(
-                        name = latestComment.author.name,
-                        imageUrl = latestComment.author.profileImageUrl,
-                        username = latestComment.author.username,
-                        size = 38.dp
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(Color(0xFF162137))
-                                .padding(horizontal = 14.dp, vertical = 10.dp)
-                        ) {
-                            Column {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = latestComment.author.name,
-                                        color = Color(0xFFF8FAFC),
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 19.sp
-                                    )
-                                    if (latestComment.author.isVerified) {
-                                        Spacer(modifier = Modifier.width(5.dp))
-                                        VerifiedBadge(size = 16.dp)
+                    // Parent comment row
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .drawBehind {
+                                if (currentComment.replies.isNotEmpty()) {
+                                    val startX = 19.dp.toPx()
+                                    val startY = 38.dp.toPx()
+                                    if (size.height > startY) {
+                                        drawLine(
+                                            color = Color(0xFF334155),
+                                            start = androidx.compose.ui.geometry.Offset(startX, startY),
+                                            end = androidx.compose.ui.geometry.Offset(startX, size.height),
+                                            strokeWidth = 1.5.dp.toPx(),
+                                            cap = StrokeCap.Round
+                                        )
                                     }
                                 }
-                                Spacer(modifier = Modifier.height(4.dp))
+                            },
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        FeatheredAvatar(
+                            name = currentComment.author.name,
+                            imageUrl = currentComment.author.profileImageUrl,
+                            username = currentComment.author.username,
+                            size = 38.dp,
+                            onClick = { onProfileClick(currentComment.author.id) }
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(Color(0xFF162137))
+                                    .clickable(onClick = onComment)
+                                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                            ) {
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = currentComment.author.name,
+                                            color = Color(0xFFF8FAFC),
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 19.sp
+                                        )
+                                        if (currentComment.author.isVerified) {
+                                            Spacer(modifier = Modifier.width(5.dp))
+                                            VerifiedBadge(size = 16.dp)
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = currentComment.text,
+                                        color = Color(0xFFCBD5E1),
+                                        fontSize = 20.sp,
+                                        lineHeight = 26.sp,
+                                        maxLines = 3,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(start = 6.dp)
+                            ) {
                                 Text(
-                                    text = latestComment.text,
-                                    color = Color(0xFFCBD5E1),
-                                    fontSize = 20.sp,
-                                    lineHeight = 26.sp
+                                    text = if (currentComment.timestamp.isNotBlank()) currentComment.timestamp else "Just now",
+                                    color = Color(0xFF64748B),
+                                    fontSize = 11.sp
                                 )
+                                Text(
+                                    text = if (currentComment.isLiked) "❤️ Liked" else "Like",
+                                    color = if (currentComment.isLiked) Color(0xFFF43F5E) else Color(0xFF94A3B8),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.clickable(onClick = onComment)
+                                )
+                                Text(
+                                    text = "Reply",
+                                    color = Color(0xFF94A3B8),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.clickable(onClick = onComment)
+                                )
+                                if (currentComment.likesCount > 0) {
+                                    Text(
+                                        text = "❤️ ${currentComment.likesCount}",
+                                        color = Color(0xFFF43F5E),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(PostsApiService.formatRelativeTime(latestComment.timestamp), color = Color(0xFF64748B), fontSize = 11.sp)
-                            Text("Reply", color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable(onClick = onComment))
+                    }
+
+                    // Threaded reply preview beneath parent comment if replies exist
+                    if (currentComment.replies.isNotEmpty()) {
+                        val reply = currentComment.replies.first()
+                        val targetUser = reply.replyToAuthorName ?: if (!reply.author.name.equals(currentComment.author.name, ignoreCase = true)) {
+                            currentComment.author.name
+                        } else null
+
+                        val cleanReplyText = if (targetUser != null && reply.text.startsWith("@$targetUser", ignoreCase = true)) {
+                            reply.text.removePrefix("@$targetUser").trimStart()
+                        } else {
+                            reply.text
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .drawBehind {
+                                    val startX = 19.dp.toPx()
+                                    val curveEndX = 38.dp.toPx()
+                                    val targetY = 16.dp.toPx()
+                                    val stroke = 1.5.dp.toPx()
+
+                                    drawLine(
+                                        color = Color(0xFF334155),
+                                        start = androidx.compose.ui.geometry.Offset(startX, 0f),
+                                        end = androidx.compose.ui.geometry.Offset(startX, targetY - 6.dp.toPx()),
+                                        strokeWidth = stroke
+                                    )
+
+                                    val path = Path().apply {
+                                        moveTo(startX, targetY - 6.dp.toPx())
+                                        quadraticBezierTo(
+                                            startX, targetY,
+                                            curveEndX, targetY
+                                        )
+                                    }
+                                    drawPath(path, color = Color(0xFF334155), style = Stroke(width = stroke, cap = StrokeCap.Round))
+                                }
+                                .padding(start = 42.dp, top = 6.dp, bottom = 2.dp)
+                                .clickable(onClick = onComment),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            FeatheredAvatar(
+                                name = reply.author.name,
+                                imageUrl = reply.author.profileImageUrl,
+                                size = 24.dp,
+                                username = reply.author.username
+                            )
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(Color(0xFF162137))
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    val annotatedString = buildAnnotatedString {
+                                        withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = Color(0xFFF8FAFC), fontSize = 13.sp)) {
+                                            append(reply.author.name)
+                                        }
+                                        if (!targetUser.isNullOrBlank()) {
+                                            append(" ")
+                                            withStyle(SpanStyle(fontWeight = FontWeight.Normal, color = Color(0xFF93C5FD), fontSize = 13.sp)) {
+                                                append(targetUser)
+                                            }
+                                        }
+                                        if (cleanReplyText.isNotBlank()) {
+                                            append(" ")
+                                            withStyle(SpanStyle(fontWeight = FontWeight.Normal, color = Color(0xFFCBD5E1), fontSize = 13.sp)) {
+                                                append(cleanReplyText)
+                                            }
+                                        }
+                                    }
+
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = annotatedString,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        )
+                                        if (reply.author.isVerified) {
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            VerifiedBadge(size = 12.dp)
+                                        }
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier.padding(start = 6.dp, top = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Text(
+                                        text = if (reply.timestamp.isNotBlank()) reply.timestamp else "Just now",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF94A3B8)
+                                    )
+                                    Text(
+                                        text = if (reply.isLiked) "❤️ Liked" else "Like",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (reply.isLiked) Color(0xFFF43F5E) else Color(0xFF94A3B8)
+                                    )
+                                    Text(
+                                        text = "Reply",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF94A3B8)
+                                    )
+                                    if (reply.likesCount > 0) {
+                                        Text(
+                                            text = "❤️ ${reply.likesCount}",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFF43F5E)
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
