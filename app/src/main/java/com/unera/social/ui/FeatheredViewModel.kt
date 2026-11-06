@@ -1466,6 +1466,15 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
 
                 val postType = if (finalMediaType == "video") "video" else if (finalMediaType == "image") "image" else "text"
 
+                val isMediaPost = finalMediaUrls.isNotEmpty() || !finalMediaUrl.isNullOrBlank() || postType == "video" || postType == "image" || allMedia.isNotEmpty()
+                val resolvedBackground = if (isMediaPost) null else {
+                    if (backgroundStyle.isNullOrBlank() || backgroundStyle.startsWith("style:none") || backgroundStyle.equals("none", ignoreCase = true)) {
+                        null
+                    } else {
+                        backgroundStyle
+                    }
+                }
+
                 // SINGLE FINAL INSERT — images AND videos use /api/posts
                 val livePost = PostsApiService.createPost(
                     userId = currentUser.id,
@@ -1479,7 +1488,7 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
                     mediaMeta = finalMediaMeta,
                     feeling = feeling,
                     location = location,
-                    background = backgroundStyle,
+                    background = resolvedBackground,
                     taggedUsers = taggedUsers,
                     type = postType,
                     visibility = "public"
@@ -1496,7 +1505,7 @@ class FeatheredViewModel(application: Application) : AndroidViewModel(applicatio
                     timestamp = "Just now",
                     feeling = feeling,
                     location = location,
-                    backgroundStyle = backgroundStyle,
+                    backgroundStyle = resolvedBackground,
                     taggedUsers = taggedUsers,
                     postType = postType,
                     videoUrl = primaryVideoUrl,

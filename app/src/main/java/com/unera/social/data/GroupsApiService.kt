@@ -885,8 +885,9 @@ object GroupsApiService {
             ?: obj.optString("background_color").takeIf { it.isNotBlank() && it != "null" }
             ?: targetObj?.optString("background_color")?.takeIf { it.isNotBlank() && it != "null" }
 
-        val backgroundStyle = rawBackgroundStyle?.trim()?.removeSurrounding("\"")?.replace("\\\"", "\"")?.takeIf {
-            it.isNotBlank() && it != "null" && it != "undefined" && !it.equals("none", ignoreCase = true)
+        val hasMedia = mediaUrls.isNotEmpty()
+        val backgroundStyle = if (hasMedia) null else rawBackgroundStyle?.trim()?.removeSurrounding("\"")?.replace("\\\"", "\"")?.takeIf {
+            it.isNotBlank() && it != "null" && it != "undefined" && !it.equals("none", ignoreCase = true) && !it.startsWith("style:none") && !it.startsWith("none|")
         }
 
         val likesCount = obj.optInt("reactions_count", obj.optInt("likes_count", 0))

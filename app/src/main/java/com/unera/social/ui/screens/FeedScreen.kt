@@ -1353,9 +1353,13 @@ fun WebPostCard(
                     (post.product != null && (cleanContent.equals(post.product.title, ignoreCase = true) || cleanContent.equals(post.product.description, ignoreCase = true))) ||
                     (post.song != null && cleanContent.contains(post.song.title, ignoreCase = true))
 
-            val hasBackground = !post.backgroundStyle.isNullOrBlank() &&
+            val hasMedia = mediaList.isNotEmpty() || !post.mediaUrl.isNullOrBlank() || post.videoUrl != null
+            val hasBackground = !hasMedia &&
+                    !post.backgroundStyle.isNullOrBlank() &&
                     !post.backgroundStyle.equals("none", ignoreCase = true) &&
-                    !post.backgroundStyle.equals("null", ignoreCase = true)
+                    !post.backgroundStyle.equals("null", ignoreCase = true) &&
+                    !post.backgroundStyle.startsWith("style:none") &&
+                    !post.backgroundStyle.startsWith("none|")
 
             if (!isDuplicateText && cleanContent.isNotBlank() && !hasBackground) {
                 val words = remember(cleanContent) {
@@ -3241,9 +3245,13 @@ fun SharedPostNestedCard(
                     }
                 }
 
-                val hasSharedBackground = !sharedPost.backgroundStyle.isNullOrBlank() &&
+                val hasSharedMedia = mediaList.isNotEmpty() || !sharedPost.mediaUrl.isNullOrBlank() || sharedPost.videoUrl != null
+                val hasSharedBackground = !hasSharedMedia &&
+                    !sharedPost.backgroundStyle.isNullOrBlank() &&
                     !sharedPost.backgroundStyle.equals("none", ignoreCase = true) &&
-                    !sharedPost.backgroundStyle.equals("null", ignoreCase = true)
+                    !sharedPost.backgroundStyle.equals("null", ignoreCase = true) &&
+                    !sharedPost.backgroundStyle.startsWith("style:none") &&
+                    !sharedPost.backgroundStyle.startsWith("none|")
 
                 if (hasSharedBackground && sharedPost.content.isNotBlank()) {
                     Spacer(modifier = Modifier.height(8.dp))

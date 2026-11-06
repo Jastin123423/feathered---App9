@@ -157,22 +157,23 @@ fun CreatePostModal(
     }
 
     val buildFinalBackgroundStyle: () -> String? = {
-        val alignStr = when (textAlignment) {
-            TextAlign.Start -> "left"
-            TextAlign.End -> "right"
-            else -> "center"
-        }
-        val colorHex = String.format("#%06X", (0xFFFFFF and textTextColor.toArgb()))
-        val bg = activeBackground
-        val baseStyle = if (bg != null && bg.id != "none") bg.styleString else ""
-        val hasCustomTextStyling = textAlignment != TextAlign.Center || textTextColor != Color.White || textFontStyle != "normal"
-
-        if (baseStyle.isNotBlank()) {
-            "$baseStyle|align:$alignStr|color:$colorHex|font:$textFontStyle"
-        } else if (hasCustomTextStyling) {
-            "style:none|align:$alignStr|color:$colorHex|font:$textFontStyle"
-        } else {
+        // If there is media (images or videos), NEVER apply any background style or colors!
+        if (mediaUrls.isNotEmpty()) {
             null
+        } else {
+            val bg = activeBackground
+            // The colour background is ONLY used when user explicitly chooses to use the colour features
+            if (bg != null && bg.id != "none" && bg.styleString.isNotBlank()) {
+                val alignStr = when (textAlignment) {
+                    TextAlign.Start -> "left"
+                    TextAlign.End -> "right"
+                    else -> "center"
+                }
+                val colorHex = String.format("#%06X", (0xFFFFFF and textTextColor.toArgb()))
+                "${bg.styleString}|align:$alignStr|color:$colorHex|font:$textFontStyle"
+            } else {
+                null
+            }
         }
     }
 
@@ -479,7 +480,7 @@ fun CreatePostModal(
                             Button(
                                 onClick = {
                                     if (canPost) {
-                                        val backgroundStyleValue = buildFinalBackgroundStyle()
+                                        val backgroundStyleValue = if (mediaUrls.isNotEmpty()) null else buildFinalBackgroundStyle()
                                         val resolvedType = if (mediaUrls.isNotEmpty()) (if (isVideoMedia) "video" else "image") else null
                                         onSubmit(
                                             content,
@@ -1163,13 +1164,14 @@ fun CreatePostModal(
                                 onClick = {
                                     if (canPost) {
                                         val resolvedType = if (mediaUrls.isNotEmpty()) (if (isVideoMedia) "video" else "image") else null
+                                        val backgroundStyleValue = if (mediaUrls.isNotEmpty()) null else buildFinalBackgroundStyle()
                                         onSubmit(
                                             content,
                                             mediaUrls.firstOrNull(),
                                             mediaUrls,
                                             selectedFeeling,
                                             selectedLocation,
-                                            buildFinalBackgroundStyle(),
+                                            backgroundStyleValue,
                                             taggedUsers.toList(),
                                             resolvedType
                                         )

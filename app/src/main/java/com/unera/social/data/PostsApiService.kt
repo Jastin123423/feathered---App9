@@ -324,10 +324,14 @@ object PostsApiService {
                 put("visibility", visibility)
                 if (!feeling.isNullOrBlank()) put("feeling", feeling)
                 if (!location.isNullOrBlank()) put("location", location)
-                if (!background.isNullOrBlank()) {
-                    put("background", background)
-                    put("colours", background)
-                    put("background_style", background)
+                val isMedia = mediaUrls.isNotEmpty() || !mediaUrl.isNullOrBlank() || type == "video" || type == "image"
+                val cleanBackground = if (isMedia) null else background?.takeIf {
+                    it.isNotBlank() && !it.startsWith("style:none") && !it.equals("none", ignoreCase = true) && !it.equals("null", ignoreCase = true)
+                }
+                if (!cleanBackground.isNullOrBlank()) {
+                    put("background", cleanBackground)
+                    put("colours", cleanBackground)
+                    put("background_style", cleanBackground)
                 }
                 if (taggedUsers.isNotEmpty()) {
                     put("tagged_users", JSONArray(taggedUsers))
@@ -434,8 +438,9 @@ object PostsApiService {
             ?: metaObj?.optString("background_style")?.takeIf { it.isNotBlank() && it != "null" }
             ?: metaObj?.optString("background")?.takeIf { it.isNotBlank() && it != "null" }
 
-        val backgroundStyle = rawBackgroundStyle?.trim()?.removeSurrounding("\"")?.replace("\\\"", "\"")?.takeIf {
-            it.isNotBlank() && it != "null" && it != "undefined" && !it.equals("none", ignoreCase = true)
+        val hasMedia = !mediaUrl.isNullOrBlank() || mediaUrls.isNotEmpty()
+        val backgroundStyle = if (hasMedia) null else rawBackgroundStyle?.trim()?.removeSurrounding("\"")?.replace("\\\"", "\"")?.takeIf {
+            it.isNotBlank() && it != "null" && it != "undefined" && !it.equals("none", ignoreCase = true) && !it.startsWith("style:none") && !it.startsWith("none|")
         }
 
         val groupId = if (obj.has("group_id") && !obj.isNull("group_id") && obj.optLong("group_id") > 0) {
@@ -921,8 +926,9 @@ object PostsApiService {
             ?: metaObj?.optString("background_style")?.takeIf { it.isNotBlank() && it != "null" }
             ?: metaObj?.optString("background")?.takeIf { it.isNotBlank() && it != "null" }
 
-        val backgroundStyle = rawBackgroundStyle?.trim()?.removeSurrounding("\"")?.replace("\\\"", "\"")?.takeIf {
-            it.isNotBlank() && it != "null" && it != "undefined" && !it.equals("none", ignoreCase = true)
+        val hasMedia = !mediaUrl.isNullOrBlank() || mediaUrls.isNotEmpty()
+        val backgroundStyle = if (hasMedia) null else rawBackgroundStyle?.trim()?.removeSurrounding("\"")?.replace("\\\"", "\"")?.takeIf {
+            it.isNotBlank() && it != "null" && it != "undefined" && !it.equals("none", ignoreCase = true) && !it.startsWith("style:none") && !it.startsWith("none|")
         }
 
         val groupId = if (obj.has("group_id") && !obj.isNull("group_id") && obj.optLong("group_id") > 0) {
